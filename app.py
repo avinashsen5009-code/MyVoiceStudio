@@ -3,105 +3,110 @@ from kokoro_onnx import Kokoro
 import soundfile as sf
 import os
 import numpy as np
-from pydub import AudioSegment
+from pydub import AudioSegment, effects
 from huggingface_hub import hf_hub_download
+import re
 
 # Setup
-st.set_page_config(page_title="Pro YT Voice Studio", layout="wide")
-st.title("🎙️ Pro YouTube Voice Studio (v1.0)")
+st.set_page_config(page_title="Pro YT Voice Studio", layout="wide", initial_sidebar_state="expanded")
+st.title("🎙️ Pro YouTube Voice Studio (v1.1 Optimized)")
 
 @st.cache_resource
 def load_tts():
-    # FIXED: Using the official onnx-community path for 2026 compatibility
+    # Official High-Speed Mirror
     model_path = hf_hub_download(
         repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", 
         filename="onnx/model.onnx"
     )
-    # This uses your voices-v1.0.bin which must be in your GitHub folder
     return Kokoro(model_path, "voices-v1.0.bin")
 
-def apply_bass_boost(audio_path, gain_db=6):
-    """Processes the WAV file to add depth and bass"""
+def process_audio_pro(audio_path, gain_db=6):
+    """Advanced audio processing: Normalization + Bass Boost"""
     audio = AudioSegment.from_wav(audio_path)
-    # Low-pass filter targets the 'chest' frequencies for that radio sound
-    bass = audio.low_pass_filter(500).apply_gain(gain_db)
-    final_audio = audio.overlay(bass)
-    final_audio.export(audio_path, format="wav")
+    
+    # 1. Normalize (Prevents clipping/distortion)
+    audio = effects.normalize(audio)
+    
+    if gain_db > 0:
+        # 2. Precision Bass Boost (Low Shelf Filter is cleaner than Low Pass)
+        # Boosts the 'warmth' frequencies (below 400Hz)
+        audio = audio.low_pass_filter(400).apply_gain(gain_db).overlay(audio)
+    
+    # 3. Final Peak Limiter (Professional Finish)
+    audio = effects.normalize(audio, headroom=0.1)
+    audio.export(audio_path, format="wav")
 
 try:
     tts = load_tts()
-    all_voices = tts.get_voices()
+    all_voices = sorted(tts.get_voices())
 
-    # --- SIDEBAR: VOICE CONTROLS ---
-    st.sidebar.header("🎛️ Voice Engineering")
+    # --- SIDEBAR ---
+    st.sidebar.header("🎛️ Studio Controls")
+    main_voice = st.sidebar.selectbox("Base Voice", all_voices, index=all_voices.index("hm_omega") if "hm_omega" in all_voices else 0)
     
-    # 1. Primary Voice
-    main_voice = st.sidebar.selectbox("Base Voice", all_voices, index=0, 
-                                     help="The main personality of your voice.")
-    
-    # 2. Voice Blending
-    enable_blend = st.sidebar.checkbox("Enable Voice Blending (Unique Voice)")
+    enable_blend = st.sidebar.checkbox("Custom Voice Blending")
     ratio = 0.5
     if enable_blend:
-        blend_voice = st.sidebar.selectbox("Secondary Voice to Mix", all_voices, index=1)
-        ratio = st.sidebar.slider("Mix Ratio (Left = Base, Right = Mix)", 0.0, 1.0, 0.5)
+        blend_voice = st.sidebar.selectbox("Mix with", all_voices, index=1)
+        ratio = st.sidebar.slider("Mix Ratio", 0.0, 1.0, 0.5)
 
-    # 3. Audio Effects (Bass Boost!)
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🔊 Audio Effects")
-    speed = st.sidebar.slider("Speaking Speed", 0.5, 2.0, 1.0)
-    bass_boost = st.sidebar.slider("Bass Boost (Depth)", 0, 15, 6)
+    speed = st.sidebar.slider("Speed", 0.5, 2.0, 1.0, step=0.1)
+    bass_boost = st.sidebar.slider("Studio Bass (dB)", 0, 15, 6)
     
-    # --- MAIN AREA: RECOMMENDATIONS ---
+    # --- MAIN INTERFACE ---
     col1, col2 = st.columns([2, 1])
 
     with col2:
-        st.info("💡 **2026 Hindi Guide (v1.0)**")
-        st.markdown("""
-        - **Male (Deep):** `hm_omega` (Use Bass 8)
-        - **Male (Smooth):** `hm_psi` (Use Bass 5)
-        - **Female (Pro):** `hf_alpha` (Use Bass 2)
-        - **Female (Soft):** `hf_beta` (Use Bass 2)
-        
-        **English Favorites:**
-        - `af_heart` (Storytelling)
-        - `af_bella` (Energetic Top 10)
-        """)
+        st.success("✨ **Pro Tip**\nUse `hm_omega` with **Bass 10** for a 'Discovery Channel' Hindi vibe.")
+        st.info("📖 **Auto-Splitter Active**\nYou can now paste very long scripts! The AI will process them sentence-by-sentence automatically.")
 
     with col1:
-        text = st.text_area("YouTube Script:", height=300, placeholder="Paste your script here...")
+        text = st.text_area("Your Script:", height=300, placeholder="Type your Hindi or English script here...")
 
-        if st.button("🚀 Generate Pro Voiceover"):
-            if text:
-                with st.spinner("Processing High-Quality Audio..."):
-                    # Step 1: Handle Blending Logic with float32 conversion
+        if st.button("🚀 Generate Studio Quality Audio"):
+            if not text.strip():
+                st.warning("Please enter a script first.")
+            else:
+                with st.spinner("🧠 AI is speaking... (Optimizing Audio)"):
+                    # Optimization: Split text by punctuation to avoid memory crashes
+                    sentences = re.split(r'([।\.!\?\n])', text)
+                    combined_samples = []
+                    
+                    # Prepare Voice Style
                     if enable_blend:
                         v1 = tts.get_voice_style(main_voice)
                         v2 = tts.get_voice_style(blend_voice)
-                        # FIXED: Ensure result is float32 for the ONNX model
-                        mixed_style = (v1 * (1 - ratio) + v2 * ratio).astype(np.float32)
-                        samples, sample_rate = tts.create(text, voice=mixed_style, speed=speed)
+                        style = (v1 * (1 - ratio) + v2 * ratio).astype(np.float32)
                     else:
-                        # FIXED: Convert single voice to float32 to avoid Tensor Error
                         style = tts.get_voice_style(main_voice).astype(np.float32)
-                        samples, sample_rate = tts.create(text, voice=style, speed=speed)
+
+                    # Process each chunk
+                    for i in range(0, len(sentences)-1, 2):
+                        chunk = sentences[i] + (sentences[i+1] if i+1 < len(sentences) else "")
+                        if chunk.strip():
+                            samples, sample_rate = tts.create(chunk, voice=style, speed=speed)
+                            combined_samples.append(samples)
                     
-                    # Step 2: Save Temporary File
-                    temp_file = "yt_output.wav"
-                    sf.write(temp_file, samples, sample_rate)
+                    if not combined_samples: # Fallback if regex fails
+                         samples, sample_rate = tts.create(text, voice=style, speed=speed)
+                         combined_samples = [samples]
+
+                    # Merge and Save
+                    final_samples = np.concatenate(combined_samples)
+                    temp_file = "studio_out.wav"
+                    sf.write(temp_file, final_samples, sample_rate)
                     
-                    # Step 3: Apply Bass Boost if selected
-                    if bass_boost > 0:
-                        apply_bass_boost(temp_file, gain_db=bass_boost)
+                    # Professional Mastering
+                    process_audio_pro(temp_file, gain_db=bass_boost)
                     
-                    # Step 4: Display Results
+                    # Display Result
                     st.audio(temp_file)
-                    st.success(f"Voiceover Ready with {bass_boost}dB Bass Boost!")
-                    
                     with open(temp_file, "rb") as f:
-                        st.download_button("📥 Download Final Voiceover", f, file_name="yt_final_voice.wav")
-            else:
-                st.warning("Please enter your script.")
+                        st.download_button("📥 Download Final Master (.WAV)", f, file_name="yt_studio_voice.wav")
+                    
+                    # Cleanup
+                    st.caption("Cleaned up memory for next run.")
 
 except Exception as e:
-    st.error(f"Setup Error: {e}")
+    st.error(f"System Error: {str(e)}")
