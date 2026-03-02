@@ -1,6 +1,6 @@
 streamlit
-kokoro-onnx
-numpy
+kokoro-onnx==0.5.0
+numpy<2.0.0
 onnxruntime
 soundfile
 pydub
