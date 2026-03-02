@@ -8,45 +8,99 @@ import time
 from datetime import datetime
 
 # --- SYSTEM CONFIG ---
-st.set_page_config(page_title="Avinash Sen Voice Studio", page_icon="🎙️", layout="wide")
+st.set_page_config(page_title="Avinash Sen Voice Studio", page_icon="💎", layout="wide")
 
-# --- THEME ENGINE (3D & Professional) ---
-def apply_theme(theme_name):
-    if "Anime" in theme_name:
-        primary = "#f06292"; bg = "linear-gradient(135deg, #fce4ec 0%, #e1f5fe 100%)"; card = "rgba(255,255,255,0.8)"; text = "#4a148c"
-    elif "Cyber" in theme_name:
-        primary = "#00f2fe"; bg = "#0a0f1e"; card = "#161e31"; text = "#00f2fe"
-    else: # Minimalist Pro
-        primary = "#1e40af"; bg = "#f1f5f9"; card = "#ffffff"; text = "#0f172a"
+# --- THEME ENGINE (Cyber 3D Gold & Gojo Integration) ---
+def apply_premium_theme():
+    # Primary Colors: Deep Space Blue, White, Luminous Gold
+    primary = "#1e40af" # Deep Blue
+    gold = "#facc15" # Luminous Gold
+    bg = "#0f172a" # Deep Space BG
+    card = "#1e293b" # Semi-Transparent Panel BG
+    text = "#f8fafc" # Clean White
 
     st.markdown(f"""
     <style>
-    .main {{ background: {bg}; color: {text}; }}
+    /* Dark Deep Space Background */
+    .main {{ 
+        background-color: {bg}; 
+        color: {text}; 
+        font-family: 'Inter', sans-serif;
+        background-image: radial-gradient(circle at 10% 20%, rgba(30, 64, 175, 0.1) 0%, rgba(15, 23, 42, 1) 90%);
+    }}
     
-    /* 3D Professional Card Effect */
+    /* 3D Glassmorphism Panels (Studio Control, Monitor) */
     [data-testid="stVerticalBlock"] > div:has(div.element-container) {{
-        background: {card} !important;
-        border-radius: 15px !important;
+        background: rgba(30, 41, 59, 0.6) !important;
+        backdrop-filter: blur(10px);
+        border-radius: 20px !important;
         padding: 1.5rem !important;
-        box-shadow: 8px 8px 16px rgba(0,0,0,0.1), -4px -4px 12px rgba(255,255,255,0.5) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         margin-bottom: 1rem;
     }}
 
-    /* 3D Tactile Button */
+    /* Luminous Gold "Generate" Button (3D Effect) */
     .stButton>button {{
-        width: 100%; background: {primary}; color: white;
-        border-radius: 10px; border: none; height: 50px;
-        font-weight: bold; text-transform: uppercase;
-        box-shadow: 0 6px 0 rgba(0,0,0,0.2); transition: 0.1s;
+        width: 100%; 
+        background: linear-gradient(135deg, #f59e0b 0%, {gold} 100%);
+        color: #0f172a !important; 
+        font-weight: 800; 
+        text-transform: uppercase; 
+        letter-spacing: 1.5px;
+        border-radius: 12px; 
+        border: none; 
+        height: 55px;
+        box-shadow: 0 0 15px rgba(250, 204, 21, 0.4);
+        transition: 0.2s ease-in-out;
     }}
-    .stButton>button:active {{ transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }}
+    .stButton>button:hover {{
+        box-shadow: 0 0 25px rgba(250, 204, 21, 0.6);
+        transform: scale(1.02);
+    }}
+    .stButton>button:active {{ 
+        transform: translateY(3px) scale(0.98); 
+    }}
     
-    .stTextArea textarea {{ border-radius: 10px !important; border: 1px solid {primary}44 !important; }}
+    /* Input Areas & Selectboxes (Cyber style) */
+    .stTextArea textarea {{ 
+        background-color: {card} !important; 
+        border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        color: {gold} !important; 
+        border-radius: 12px !important;
+        font-family: 'Courier New', monospace;
+    }}
+    .stSelectbox div[data-baseweb="select"] {{
+        background-color: {card} !important;
+        color: {text} !important;
+        border-radius: 10px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }}
+    
+    /* Global Text Styling */
+    h1, h2, h3, .stCaption {{ color: {text}; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }}
+    
+    /* Gojo Character Overlay */
+    #gojo-monitor {{
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 300px;
+        opacity: 0.8;
+        z-index: 1000;
+        pointer-events: none;
+    }}
     </style>
+    
+    <div id="gojo-monitor">
+        <img src="https://raw.githubusercontent.com/leonelhs/kokoro-thewh1teagle/main/media/gojo_monitor_v1.png" alt="Gojo Monitor">
+    </div>
     """, unsafe_allow_html=True)
 
-# --- ENGINE LOADER ---
+# Apply Theme immediately
+apply_premium_theme()
+
+# --- ENGINE LOADER (Stable) ---
 @st.cache_resource(show_spinner=False)
 def load_kokoro():
     try:
@@ -54,37 +108,10 @@ def load_kokoro():
         voices_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
         return Kokoro(model_path, voices_path)
     except Exception as e:
-        st.error(f"Engine connection lost: {e}")
+        st.error(f"Engine connection failure: {e}")
         return None
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.title("🛡️ STUDIO SETTINGS")
-    theme_choice = st.selectbox("Current Environment", ["Minimalist Pro 💼", "Anime Kawaii 🌸", "Cyber 3D 🧊"])
-    apply_theme(theme_choice)
-    
-    st.markdown("---")
-    st.header("🎭 VOICE DIRECTORY")
-    
-    VOICES = {
-        "af_bella": "🎙️ Bella (News)", "af_sarah": "✨ Sarah (Soft)", "af_nicole": "📖 Nicole (Narrator)",
-        "af_sky": "🎭 Sky (Energetic)", "af_heart": "💖 Heart (Warm)", "af_alloy": "🛡️ Alloy (Neutral)",
-        "am_adam": "🎬 Adam (Movie)", "am_onyx": "🌑 Onyx (Deep)", "am_michael": "👨‍🏫 Michael (Professor)",
-        "am_puck": "⚡ Puck (Hyper)", "am_fenrir": "🐺 Fenrir (Gravelly)"
-    }
-    
-    mode = st.radio("Processing Mode", ["Solo Persona", "Vocal Fusion (Mix)"])
-    if mode == "Solo Persona":
-        v_choice = st.selectbox("Active Character", list(VOICES.keys()), format_func=lambda x: VOICES[x])
-    else:
-        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=0)
-        v2 = st.selectbox("Target Soul", list(VOICES.keys()), index=3)
-        ratio = st.slider("Mix Balance", 0.0, 1.0, 0.5)
-
-    speed = st.slider("Speech Tempo", 0.5, 2.0, 1.0)
-
-# --- LOGIC HELPERS ---
-kokoro = load_kokoro()
+# Initialize History
 if 'history' not in st.session_state: st.session_state.history = []
 
 def get_srt(text, dur):
@@ -97,15 +124,48 @@ def get_srt(text, dur):
         srt += f"{i+1}\n{f(s)} --> {f(e)}\n{w}\n\n"
     return srt
 
+# --- SIDEBAR: STUDIO CONTROLS ---
+with st.sidebar:
+    st.markdown("### 💎 STUDIO CONTROL PANEL")
+    
+    st.selectbox("ENVIRONMENT THEME", ["Cyber 3D Gold 🧊", "Minimalist Pro 💼", "Anime Kawaii 🌸"])
+    
+    if st.button("🔄 FORCE REBOOT ENGINE"):
+        st.cache_resource.clear()
+        st.rerun()
+    
+    st.markdown("---")
+    st.header("🎭 VOICE DIRECTORY")
+    
+    VOICES = {
+        "af_bella": "🎙️ Bella (Professional)", "af_sarah": "✨ Sarah (Soft)", "af_heart": "💖 Heart (Warm)", 
+        "af_sky": "🎭 Sky (Energetic)", "am_adam": "🎬 Adam (Movie)", "am_onyx": "🌑 Onyx (Deep)", 
+        "am_michael": "👨‍🏫 Michael (Professor)", "am_fenrir": "🐺 Fenrir (Gravelly)"
+    }
+    
+    mode = st.radio("PROCESSING MODE", ["Solo Persona", "Vocal Fusion (Mix)"])
+    if mode == "Solo Persona":
+        v_choice = st.selectbox("ACTIVE CHARACTER", list(VOICES.keys()), format_func=lambda x: VOICES[x])
+    else:
+        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=0)
+        v2 = st.selectbox("Target Soul", list(VOICES.keys()), index=3)
+        ratio = st.slider("Mix Balance", 0.0, 1.0, 0.5)
+
+    speed = st.slider("SPEECH TEMPO", 0.5, 2.0, 1.0)
+
+# Load engine
+kokoro = load_kokoro()
+
 # --- MAIN STUDIO ---
 st.title("💎 AVINASH SEN VOICE STUDIO")
+st.caption("PROFESSIONAL AI VOICE SYNTHESIS v5.1")
 
 l, r = st.columns([1, 1])
 
 with l:
-    st.subheader("📝 Script Console")
-    text_input = st.text_area("Dialogue", placeholder="Enter script...", height=300, label_visibility="collapsed")
-    if st.button("🚀 GENERATE MASTER AUDIO"):
+    st.markdown("### 📝 SCRIPT MASTER & GENERATION")
+    text_input = st.text_area("Dialogue", placeholder="Enter final dialogue here, Master Avinash. The spirits await...", height=320, label_visibility="collapsed")
+    if st.button("⚡ GENERATE MASTER AUDIO"):
         if text_input.strip() and kokoro:
             try:
                 with st.spinner("Synthesizing vectors..."):
@@ -121,7 +181,6 @@ with l:
                     buf = io.BytesIO()
                     sf.write(buf, samples, sample_rate, format='WAV')
                     
-                    # Update Session State
                     st.session_state.current_audio_data = buf.getvalue()
                     st.session_state.current_srt = get_srt(text_input, len(samples)/sample_rate)
                     st.session_state.current_vname = v_name
@@ -129,25 +188,25 @@ with l:
                     # History
                     st.session_state.history.insert(0, {"v": v_name, "a": buf.getvalue(), "t": text_input[:30]})
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Critical error: {e}")
 
 with r:
-    st.subheader("🎧 Production Monitor")
+    st.markdown("### 🎧 PRODUCTION MONITOR & OUTPUT")
     if 'current_audio_data' in st.session_state:
-        # Standard audio player without the 'key' argument to prevent the error
         st.audio(st.session_state.current_audio_data, format="audio/wav")
-        st.caption(f"Active Identity: {st.session_state.current_vname}")
+        st.info(f"Identity: {st.session_state.current_vname}")
         
+        st.markdown("### 📥 DOWNLOAD CENTER")
         d1, d2 = st.columns(2)
-        d1.download_button("📥 Download WAV", st.session_state.current_audio_data, "voice_export.wav")
-        d2.download_button("📜 Get SRT", st.session_state.current_srt, "subtitles.srt")
+        d1.download_button("WAV MASTER 📥", st.session_state.current_audio_data, "master_export.wav")
+        d2.download_button("SRT SUBTITLES 📜", st.session_state.current_srt, "subtitles.srt")
     else:
-        st.info("System Ready. Waiting for script synthesis...")
+        st.info("Awaiting input to begin rendering.")
 
 # --- HISTORY ---
 st.markdown("---")
-st.subheader("🕒 Session Logs")
+st.markdown("### 🕒 SESSION LOGS")
 if st.session_state.history:
     for i, item in enumerate(st.session_state.history[:3]):
-        with st.expander(f"Record {i+1}: {item['v']} | {item['t']}..."):
+        with st.expander(f"Rec: {item['v']} | {item['t']}..."):
             st.audio(item['a'], format="audio/wav")
