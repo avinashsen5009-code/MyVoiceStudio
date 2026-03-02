@@ -5,157 +5,199 @@ import soundfile as sf
 import numpy as np
 import io
 import time
-import math
 from datetime import datetime
 
 # --- SYSTEM CONFIG ---
-st.set_page_config(page_title="NEON KOKORO V4", page_icon="🌌", layout="wide")
+st.set_page_config(page_title="Avinash Sen Voice Studio", page_icon="🌸", layout="wide")
 
-# Futuristic Cyberpunk CSS
+# ✨ ANIME THEME CSS ✨
 st.markdown("""
     <style>
-    .main { background-color: #060606; color: #e0e0e0; }
-    div[data-testid="stSidebar"] { background-color: #0d0d0d; border-right: 1px solid #00f2fe; }
-    .stTextArea textarea { background-color: #1a1a1a !important; color: #00f2fe !important; border: 1px solid #333 !important; }
-    .stButton>button {
-        width: 100%; background: linear-gradient(90deg, #00f2fe, #4facfe);
-        color: black; font-weight: bold; border-radius: 5px; border: none;
-        box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+    /* Anime Pastel Background */
+    .main { 
+        background: linear-gradient(135deg, #fce4ec 0%, #e1f5fe 100%); 
+        color: #4a148c; 
     }
-    .history-card { background: #111; border-left: 5px solid #00f2fe; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    
+    /* Sidebar: Soft Blue */
+    div[data-testid="stSidebar"] { 
+        background-color: rgba(255, 255, 255, 0.6) !important; 
+        backdrop-filter: blur(15px);
+        border-right: 3px solid #f06292; 
+    }
+    
+    /* Text Area: Kawaii Style */
+    .stTextArea textarea { 
+        background-color: rgba(255, 255, 255, 0.8) !important; 
+        color: #1a237e !important; 
+        border: 2px solid #ce93d8 !important; 
+        border-radius: 15px !important;
+    }
+    
+    /* Buttons: Vibrant Pink to Purple */
+    .stButton>button {
+        width: 100%; 
+        background: linear-gradient(90deg, #f06292, #ba68c8);
+        color: white; 
+        font-weight: bold; 
+        border-radius: 20px; 
+        border: none;
+        box-shadow: 0 4px 10px rgba(240, 98, 146, 0.3);
+        height: 50px;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(240, 98, 146, 0.5);
+    }
+    
+    /* History Cards */
+    .history-card { 
+        background: rgba(255, 255, 255, 0.7); 
+        border-left: 8px solid #f06292; 
+        padding: 15px; 
+        margin: 10px 0; 
+        border-radius: 12px;
+        color: #4a148c;
+    }
+    
+    h1, h2, h3 { font-family: 'Comic Sans MS', cursive, sans-serif; color: #ad1457; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- STABLE ENGINE LOADER ---
-@st.cache_resource
-def load_kokoro():
+@st.cache_resource(show_spinner=False)
+def load_kokoro(version_tag):
     REPO_ID = "leonelhs/kokoro-thewh1teagle"
     try:
         model_path = hf_hub_download(repo_id=REPO_ID, filename="kokoro-v1.0.onnx")
         voices_path = hf_hub_download(repo_id=REPO_ID, filename="voices-v1.0.bin")
         return Kokoro(model_path, voices_path)
     except Exception as e:
-        st.error(f"Engine Failure: {e}")
+        st.error(f"Oh no! The engine is shy: {e}")
         return None
 
-kokoro = load_kokoro()
-
-# --- UTILITY: SRT GENERATOR ---
-def generate_srt(text, duration):
-    words = text.split()
-    if not words: return ""
+# --- SIDEBAR: ANIME CONTROLS ---
+with st.sidebar:
+    st.title("🌸 STUDIO SETTINGS")
+    if st.button("✨ Reset Magic Engine"):
+        st.cache_resource.clear()
+        st.rerun()
     
-    avg_word_dur = duration / len(words)
-    srt_content = ""
+    st.markdown("---")
+    st.header("🎭 Choose Persona")
     
-    for i, word in enumerate(words):
-        start_time = i * avg_word_dur
-        end_time = (i + 1) * avg_word_dur
-        
-        def format_time(seconds):
-            hrs = int(seconds // 3600)
-            mins = int((seconds % 3600) // 60)
-            secs = int(seconds % 60)
-            msecs = int((seconds - int(seconds)) * 1000)
-            return f"{hrs:02}:{mins:02}:{secs:02},{msecs:03}"
-        
-        srt_content += f"{i+1}\n{format_time(start_time)} --> {format_time(end_time)}\n{word}\n\n"
-    return srt_content
+    VOICES = {
+        "af_bella": "🎙️ Bella (Professional)",
+        "af_sarah": "✨ Sarah (Friendly)",
+        "af_nicole": "📖 Nicole (Soft Narrator)",
+        "af_sky": "🎭 Sky (High Energy/Anime)",
+        "am_adam": "🎬 Adam (Movie Trailer)",
+        "am_onyx": "🌑 Onyx (Deep/Cool)",
+        "am_michael": "👨‍🏫 Michael (Professor)",
+        "am_puck": "⚡ Puck (Hyper/Excited)"
+    }
+    
+    mode = st.radio("Voice Mode", ["Single Character", "Fusion Mix"], index=0)
+    
+    if mode == "Single Character":
+        v_choice = st.selectbox("Active Character", list(VOICES.keys()), format_func=lambda x: VOICES[x])
+    else:
+        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=0)
+        v2 = st.selectbox("Fusion Soul", list(VOICES.keys()), index=3) # Default Sky for anime feel
+        mix_ratio = st.slider("Fusion Balance", 0.0, 1.0, 0.5)
 
-# --- INITIALIZE SESSION ---
+    speed = st.slider("Speech Flow", 0.5, 2.0, 1.0)
+    st.caption("Lower = Dramatic. Higher = Fast Paced!")
+
+# Initialize Engine
+kokoro = load_kokoro(st.session_state.get('engine_ver', 1.0))
+
 if 'history' not in st.session_state:
     st.session_state.history = []
 
-# --- VOICE DIRECTORY ---
-VOICES = {
-    "af_bella": "🎙️ News/Business (Female)",
-    "af_sarah": "✨ Friendly/Podcast (Female)",
-    "am_adam": "🎬 Movie Trailer (Male)",
-    "am_onyx": "🌑 Dark/Authoritative (Male)",
-    "af_sky": "🎭 Energetic/Anime (Female)",
-    "am_michael": "👨‍🏫 Educational (Male)"
-}
+# --- SRT GENERATOR ---
+def generate_srt(text, duration):
+    words = text.split()
+    if not words: return ""
+    avg_word_dur = duration / len(words)
+    srt_content = ""
+    for i, word in enumerate(words):
+        start = i * avg_word_dur
+        end = (i + 1) * avg_word_dur
+        def fmt(s):
+            m, s = divmod(s, 60); h, m = divmod(m, 60)
+            return f"{int(h):02}:{int(m):02}:{int(s):02},{int((s-int(s))*1000):03}"
+        srt_content += f"{i+1}\n{fmt(start)} --> {fmt(end)}\n{word}\n\n"
+    return srt_content
 
-# --- MAIN INTERFACE ---
-st.title("🌌 NEON KOKORO STUDIO v4.0")
-st.write("Next-Gen Voice Synthesis with Auto-Subtitles")
+# --- MAIN DASHBOARD ---
+st.title("✨ AVINASH SEN VOICE STUDIO")
+st.write("Crafting beautiful anime-style voices with high-fidelity AI.")
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.header("🎛️ Control Panel")
-    mode = st.tabs(["Single Mode", "Hybrid (Mix) Mode"])
-    
-    with mode[0]:
-        v_choice = st.selectbox("Select Personality", list(VOICES.keys()), format_func=lambda x: VOICES[x])
-    
-    with mode[1]:
-        v1 = st.selectbox("Base Voice", list(VOICES.keys()), index=0, key="v1")
-        v2 = st.selectbox("Target Voice", list(VOICES.keys()), index=2, key="v2")
-        mix_ratio = st.slider("Mix Ratio", 0.0, 1.0, 0.5)
-
-    speed = st.slider("Flow Speed", 0.5, 2.0, 1.0)
-    text_input = st.text_area("📜 Script", placeholder="Enter your script here...", height=250)
-    
-    gen_btn = st.button("🚀 INITIATE SYNTHESIS")
+    st.markdown("### 📝 SCRIPT SCROLL")
+    text_input = st.text_area("", placeholder="Enter your dialogue here, senpai...", height=300, label_visibility="collapsed")
+    gen_btn = st.button("🌟 GENERATE VOICE")
 
 with col2:
-    st.header("⚡ Output Console")
+    st.markdown("### 🎧 AUDIO PREVIEW")
     if gen_btn and text_input.strip():
         try:
-            with st.spinner("Rendering quantum audio..."):
-                # Synthesis Logic
-                if "Single" in str(mode):
+            with st.spinner("Summoning voice spirits..."):
+                ts = int(time.time()) # Unique key to fix the "no change" bug
+                
+                if mode == "Single Character":
                     samples, sample_rate = kokoro.create(text_input, voice=v_choice, speed=speed, lang="en-us")
-                    final_voice = v_choice
+                    display_voice = v_choice
                 else:
-                    s1, s2 = kokoro.get_voice_style(v1), kokoro.get_voice_style(v2)
-                    mixed = (s1 * (1 - mix_ratio)) + (s2 * mix_ratio)
-                    samples, sample_rate = kokoro.create(text_input, voice=mixed, speed=speed, lang="en-us")
-                    final_voice = f"Mix({v1}/{v2})"
+                    s1 = kokoro.get_voice_style(v1)
+                    s2 = kokoro.get_voice_style(v2)
+                    blended = (s1 * (1 - mix_ratio)) + (s2 * mix_ratio)
+                    samples, sample_rate = kokoro.create(text_input, voice=blended, speed=speed, lang="en-us")
+                    display_voice = f"Fusion ({v1}/{v2})"
 
-                # Audio Export
                 buf = io.BytesIO()
                 sf.write(buf, samples, sample_rate, format='WAV')
-                audio_data = buf.getvalue()
+                audio_bytes = buf.getvalue()
                 duration = len(samples) / sample_rate
-
-                # SRT Export
                 srt_data = generate_srt(text_input, duration)
 
-                # UI Display
-                st.audio(audio_data)
-                st.success(f"Generated {duration:.2f}s of audio")
+                # Unique Audio Player to force voice change
+                st.audio(audio_bytes, format="audio/wav", key=f"audio_{ts}")
                 
-                # Downloads
-                dl1, dl2 = st.columns(2)
-                with dl1:
-                    st.download_button("📥 Download WAV", audio_data, "voice.wav", "audio/wav")
-                with dl2:
-                    st.download_button("📥 Download SRT", srt_data, "subtitles.srt", "text/plain")
+                st.success(f"Synthesis Complete! ({duration:.2f}s)")
+                
+                # Anime Styled Downloads
+                d_col1, d_col2 = st.columns(2)
+                d_col1.download_button("🎀 Save Audio", audio_bytes, f"avinash_voice_{ts}.wav", "audio/wav")
+                d_col2.download_button("📝 Get Subtitles", srt_data, f"subs_{ts}.srt", "text/plain")
 
-                # History Save
+                # Session History
                 st.session_state.history.insert(0, {
-                    "time": datetime.now().strftime("%H:%M"),
-                    "voice": final_voice,
-                    "text": text_input[:40] + "...",
-                    "audio": audio_data,
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "voice": display_voice,
+                    "text": text_input[:50] + "...",
+                    "audio": audio_bytes,
+                    "key": ts,
                     "srt": srt_data
                 })
         except Exception as e:
-            st.error(f"Critical System Error: {e}")
+            st.error(f"Something went wrong: {e}")
     else:
-        st.info("System Ready. Awaiting Script Input...")
+        st.info("Ready for your script! Type something and press the button.")
 
-# --- HISTORY SECTION ---
+# --- PRODUCTION LOGS ---
 st.markdown("---")
-st.subheader("🕒 Production History")
+st.subheader("🕒 RECENT CREATIONS")
 if st.session_state.history:
-    for i, item in enumerate(st.session_state.history[:5]):
+    for item in st.session_state.history[:5]:
         with st.container():
-            st.markdown(f"""<div class="history-card"><b>{item['time']} | {item['voice']}</b><br>{item['text']}</div>""", unsafe_allow_html=True)
+            st.markdown(f'<div class="history-card"><b>{item["time"]} | {item["voice"]}</b><br>{item["text"]}</div>', unsafe_allow_html=True)
             h_col1, h_col2 = st.columns([2, 1])
-            with h_col1: st.audio(item['audio'])
-            with h_col2: st.download_button("Get SRT", item['srt'], f"subs_{i}.srt", key=f"srt_{i}")
+            with h_col1: st.audio(item["audio"], key=f"hist_{item['key']}")
+            with h_col2: st.download_button("SRT", item['srt'], f"srt_{item['key']}.srt", key=f"dl_{item['key']}")
 else:
-    st.caption("History will appear here after your first generation.")
+    st.caption("Your production logs will appear here.")
