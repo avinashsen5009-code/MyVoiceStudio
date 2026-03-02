@@ -8,21 +8,23 @@ import time
 from datetime import datetime
 
 # --- 1. CORE SYSTEM ---
-st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
+st.set_page_config(page_title="VOICE STUDIO", layout="wide", page_icon="💎")
 
 if 'history' not in st.session_state: st.session_state.history = []
 if 'last_audio' not in st.session_state: st.session_state.last_audio = None
+# Initialize theme state before anything loads
+if 'theme' not in st.session_state: st.session_state.theme = "Cyber 3D Gold 🧊"
 
-# --- 2. SCRIPT CLEANER (NEW FEATURE) ---
+# --- 2. SCRIPT CLEANER ---
 def clean_script(text):
-    # Removes anything inside [brackets] or (parentheses)
     cleaned = re.sub(r'\[.*?\]', '', text)
     cleaned = re.sub(r'\(.*?\)', '', cleaned)
-    # Removes extra spaces and newlines
     return " ".join(cleaned.split())
 
 # --- 3. INSTANT THEME ENGINE ---
-def apply_theme(theme):
+# Applied at the very top so changes reflect immediately
+def apply_theme():
+    theme = st.session_state.theme
     if theme == "Cyber 3D Gold 🧊":
         bg, acc, card, txt = "#0f172a", "#fbbf24", "rgba(30, 41, 59, 0.8)", "#f8fafc"
     elif theme == "Anime Pastel 🌸":
@@ -45,6 +47,8 @@ def apply_theme(theme):
     </style>
     """, unsafe_allow_html=True)
 
+apply_theme()
+
 # --- 4. ENGINE LOADER ---
 @st.cache_resource(show_spinner=False)
 def get_engine():
@@ -57,8 +61,11 @@ l, m, r = st.columns([1, 1.4, 1])
 
 with l:
     st.subheader("🛡️ STUDIO CONTROL")
-    theme_choice = st.selectbox("🎨 ACTIVE THEME", ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"])
-    apply_theme(theme_choice)
+    
+    # THEME FIX: key="theme" links directly to session_state
+    st.selectbox("🎨 ACTIVE THEME", 
+                 ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"], 
+                 key="theme")
     
     try:
         st.image("gojo.jpg", use_container_width=True)
@@ -73,10 +80,12 @@ with l:
         "am_fenrir": "🐺 Fenrir (Gravelly)", "am_michael": "👨‍🏫 Michael (Tech)"
     }
     
-    mode = st.radio("VOICE ARCHITECTURE", ["Solo Identity", "Gojo Fusion (Mix)"])
-    if mode == "Gojo Fusion (Mix)":
-        v1, v2, mix_ratio = "am_onyx", "af_sky", 0.75
-        st.info("Configured: 75% Onyx + 25% Sky")
+    # MIXING FIX: Restored full custom voice fusion
+    mode = st.radio("VOICE ARCHITECTURE", ["Solo Identity", "Custom Mix (Fusion)"])
+    if mode == "Custom Mix (Fusion)":
+        v1 = st.selectbox("Base Voice", list(VOICES.keys()), index=0, format_func=lambda x: VOICES[x])
+        v2 = st.selectbox("Target Voice", list(VOICES.keys()), index=1, format_func=lambda x: VOICES[x])
+        mix_ratio = st.slider("Base Ratio (%)", 0.0, 1.0, 0.75)
     else:
         v_id = st.selectbox("SELECT VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x])
     
@@ -93,9 +102,10 @@ with m:
             final_text = clean_script(script) if do_clean else script
             
             with st.spinner("Synthesizing Clean Audio..."):
-                if mode == "Gojo Fusion (Mix)":
-                    s1, s2 = engine.get_voice_style("am_onyx"), engine.get_voice_style("af_sky")
-                    blend = (s1 * 0.75) + (s2 * 0.25)
+                # Apply custom mix logic
+                if mode == "Custom Mix (Fusion)":
+                    s1, s2 = engine.get_voice_style(v1), engine.get_voice_style(v2)
+                    blend = (s1 * mix_ratio) + (s2 * (1.0 - mix_ratio))
                     samples, sr = engine.create(final_text, voice=blend, speed=speed, lang="en-us")
                 else:
                     samples, sr = engine.create(final_text, voice=v_id, speed=speed, lang="en-us")
