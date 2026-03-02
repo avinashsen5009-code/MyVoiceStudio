@@ -4,4 +4,4 @@ soundfile
 pydub
 numpy
 huggingface_hub
-pyaudioop-lts
+audioop-lts
