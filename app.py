@@ -10,122 +10,128 @@ from datetime import datetime
 # --- 1. CORE STUDIO CONFIGURATION ---
 st.set_page_config(page_title="AVINASH SEN VOICE STUDIO", page_icon="💎", layout="wide")
 
-# --- 2. THEME ENGINE: CYBER-GOLD 3D ---
-st.markdown("""
+# --- 2. DYNAMIC THEME ENGINE (3D NEUMORPHIC) ---
+if 'theme' not in st.session_state:
+    st.session_state.theme = "Cyber 3D Gold 🧊"
+
+def apply_theme(theme_choice):
+    if theme_choice == "Cyber 3D Gold 🧊":
+        bg = "radial-gradient(circle at center, #0f172a 0%, #020617 100%)"
+        accent = "#fbbf24"; card = "rgba(30, 41, 59, 0.7)"; text = "#f8fafc"
+    elif theme_choice == "Anime Pastel 🌸":
+        bg = "linear-gradient(135deg, #fce4ec 0%, #e1f5fe 100%)"
+        accent = "#f06292"; card = "rgba(255, 255, 255, 0.8)"; text = "#4a148c"
+    else: # Minimalist Pro
+        bg = "#f8fafc"; accent = "#1e40af"; card = "#ffffff"; text = "#1e293b"
+
+    st.markdown(f"""
     <style>
-    .main { 
-        background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
-        color: #f8fafc;
-        font-family: 'Inter', sans-serif;
-    }
-    div[data-testid="column"] > div {
-        background: rgba(30, 41, 59, 0.45) !important;
-        backdrop-filter: blur(12px);
+    .main {{ background: {bg}; color: {text}; font-family: 'Inter', sans-serif; }}
+    div[data-testid="column"] > div {{
+        background: {card} !important;
+        backdrop-filter: blur(15px);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 20px !important;
-        padding: 2.5rem !important;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+        padding: 2rem !important;
+        box-shadow: 10px 10px 30px rgba(0,0,0,0.5);
         margin-bottom: 1.5rem;
-    }
-    h1, h2, h3 { 
-        color: #fbbf24; 
-        text-transform: uppercase; 
-        letter-spacing: 3px; 
-        font-weight: 900;
-        border-bottom: 2px solid rgba(251, 191, 36, 0.2);
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        color: #020617 !important;
-        font-weight: 800;
-        border-radius: 12px;
-        border: none;
-        height: 60px;
-        box-shadow: 0 5px 0 #b45309, 0 12px 20px rgba(245, 158, 11, 0.3);
-        transition: all 0.1s ease;
-    }
-    .stButton>button:active {
-        transform: translateY(4px);
-        box-shadow: 0 0px 0 #b45309;
-    }
-    .stTextArea textarea { 
-        background-color: #020617 !important; 
-        color: #fbbf24 !important; 
-        border: 1px solid #334155 !important;
-        border-radius: 12px !important;
-    }
+    }}
+    h1, h2, h3 {{ color: {accent}; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; }}
+    .stButton>button {{
+        width: 100%; background: linear-gradient(135deg, {accent} 0%, #f59e0b 100%);
+        color: #000 !important; font-weight: 800; border-radius: 12px; height: 55px;
+        box-shadow: 0 4px 0 rgba(0,0,0,0.3); transition: 0.1s; border: none;
+    }}
+    .stButton>button:active {{ transform: translateY(4px); box-shadow: 0 0px 0 transparent; }}
+    .stTextArea textarea {{ background: #000 !important; color: {accent} !important; border-radius: 12px !important; border: 1px solid {accent}33 !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ENGINE LOADER ---
+apply_theme(st.session_state.theme)
+
+# --- 3. ENGINE & SRT UTILITIES ---
 @st.cache_resource(show_spinner=False)
-def load_studio_engine():
-    try:
-        m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
-        v = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
-        return Kokoro(m, v)
-    except Exception as e:
-        st.error(f"SYSTEM OFFLINE: {e}")
-        return None
+def load_engine():
+    m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
+    v = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
+    return Kokoro(m, v)
 
-kokoro = load_studio_engine()
+def generate_srt(text, dur):
+    words = text.split(); srt = ""
+    if not words: return ""
+    step = dur / len(words)
+    for i, w in enumerate(words):
+        s, e = i * step, (i+1) * step
+        f = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},000"
+        srt += f"{i+1}\n{f(s)} --> {f(e)}\n{w}\n\n"
+    return srt
 
-# --- 4. APP LAYOUT ---
+kokoro = load_engine()
+
+# --- 4. PRODUCTION LAYOUT ---
 st.title("💎 AVINASH SEN VOICE STUDIO")
-st.caption("DOMAIN EXPANSION: PROFESSIONAL AI VOICE SYNTHESIS v7.0")
+st.caption("DOMAIN EXPANSION • MASTER PRODUCTION SUITE v9.0")
 
-col_ctrl, col_main, col_mon = st.columns([1, 1.3, 1])
+l, m, r = st.columns([1, 1.4, 1])
 
-with col_ctrl:
-    st.subheader("⚙️ CORE CONTROLS")
-    
-    # PASTE YOUR GOOGLE IMAGE LINK HERE
-    # I've put a reliable Gojo link below as a default
-    gojo_url = "https://www.google.com/imgres?q=gojo&imgurl=https%3A%2F%2Frukminim2.flixcart.com%2Fimage%2F480%2F640%2Fxif0q%2Fposter%2Fd%2Fn%2Fj%2Fsmall-satoru-gojo-jujutsu-kaisen-wall-poster-asstore-red21-original-imahb3zppzmftams.jpeg%3Fq%3D90&imgrefurl=https%3A%2F%2Fwww.flipkart.com%2Fsatoru-gojo-jujutsu-kaisen-wall-poster-paper-print%2Fp%2Fitmfdd11d61340f1&docid=DZ1lh2VNYiFudM&tbnid=mFl0x2t9D2WJhM&vet=12ahUKEwiX1bHs54GTAxU1bPUHHVzmAt0QM3oECB8QAA..i&w=435&h=640&hcb=2&ved=2ahUKEwiX1bHs54GTAxU1bPUHHVzmAt0QM3oECB8QAA"
+with l:
+    st.subheader("🛡️ GUARDIAN")
+    # YOUR GOJO IMAGE LINK (Direct Proxy for Google Shared Link)
+    gojo_url = "https://share.google/images/liqR9LBTTIuszTpXt"
     st.image(gojo_url, caption="SATORU GOJO | THE STRONGEST", use_container_width=True)
     
-    st.markdown("---")
+    st.session_state.theme = st.selectbox("ACTIVE THEME", ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"])
+    
     VOICES = {
-        "GOJO_MODE": "🌌 GOJO (UNLIMITED VOID)",
-        "am_fenrir": "🐺 FENRIR (DEEP GRAVEL)",
-        "af_sky": "🎭 SKY (ANIME ENERGY)",
-        "af_bella": "🎙️ BELLA (BUSINESS PRO)",
-        "am_onyx": "🌑 ONYX (CINEMATIC DARK)"
+        "af_bella": "🎙️ Bella (Pro)", "af_sarah": "✨ Sarah (Soft)", "af_sky": "🎭 Sky (Anime)",
+        "af_heart": "💖 Heart (Kind)", "am_adam": "🎬 Adam (Movie)", "am_onyx": "🌑 Onyx (Deep)",
+        "am_michael": "👨‍🏫 Michael (Pro)", "am_fenrir": "🐺 Fenrir (Gravelly)"
     }
     
-    v_choice = st.selectbox("VOICE IDENTITY", list(VOICES.keys()), format_func=lambda x: VOICES[x])
-    speed = st.slider("SPEECH TEMPO", 0.5, 2.0, 1.05)
+    mode = st.radio("SYNTHESIS MODE", ["Solo Persona", "Vocal Fusion (Mix)"])
+    if mode == "Solo Persona":
+        v_id = st.selectbox("IDENTITY", list(VOICES.keys()), format_func=lambda x: VOICES[x])
+    else:
+        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=5) # Onyx
+        v2 = st.selectbox("Target Soul", list(VOICES.keys()), index=2) # Sky
+        ratio = st.slider("Mix Ratio", 0.0, 1.0, 0.7)
     
-    if st.button("🔄 REBOOT ENGINE"):
-        st.cache_resource.clear()
-        st.rerun()
+    speed = st.slider("TEMPO CONTROL", 0.5, 2.0, 1.0)
 
-with col_main:
-    st.subheader("📝 SCRIPT MASTER")
-    text_input = st.text_area("Dialogue", placeholder="What is your command, Master Avinash?", height=420, label_visibility="collapsed")
+with m:
+    st.subheader("📜 SCRIPT MASTER")
+    text = st.text_area("", placeholder="Speak your truth, Master Avinash...", height=400, label_visibility="collapsed")
     
-    if st.button("⚡ INITIATE MASTER SYNTHESIS"):
-        if text_input.strip() and kokoro:
-            with st.spinner("EXPANDING DOMAIN..."):
-                if v_choice == "GOJO_MODE":
-                    s1 = kokoro.get_voice_style("am_onyx")
-                    s2 = kokoro.get_voice_style("af_sky")
-                    mixed = (s1 * 0.70) + (s2 * 0.30)
-                    samples, sample_rate = kokoro.create(text_input, voice=mixed, speed=speed, lang="en-us")
+    if st.button("🚀 INITIATE QUANTUM RENDER"):
+        if text.strip() and kokoro:
+            with st.spinner("EXPANDING VOID..."):
+                if mode == "Solo Persona":
+                    samples, sr = kokoro.create(text, voice=v_id, speed=speed, lang="en-us")
+                    vn = v_id
                 else:
-                    samples, sample_rate = kokoro.create(text_input, voice=v_choice, speed=speed, lang="en-us")
+                    s1, s2 = kokoro.get_voice_style(v1), kokoro.get_voice_style(v2)
+                    blend = (s1 * (1 - ratio)) + (s2 * ratio)
+                    samples, sr = kokoro.create(text, voice=blend, speed=speed, lang="en-us")
+                    vn = f"Fusion({v1}/{v2})"
                 
                 buf = io.BytesIO()
-                sf.write(buf, samples, sample_rate, format='WAV')
-                st.session_state.final_audio = buf.getvalue()
-                st.session_state.vname = v_choice
+                sf.write(buf, samples, sr, format='WAV')
+                st.session_state.prod = (buf.getvalue(), vn, len(samples)/sr, generate_srt(text, len(samples)/sr))
 
-with col_mon:
+with r:
     st.subheader("🎧 MONITOR")
-    if 'final_audio' in st.session_state:
-        st.success(f"IDENTITY: {st.session_state.vname}")
-        st.audio(st.session_state.final_audio, format="audio/wav")
-        st.download_button("WAV MASTER 📥", st.session_state.final_audio, f"master.wav")
+    if 'prod' in st.session_state:
+        aud, vn, dur, srt = st.session_state.prod
+        st.audio(aud, format="audio/wav")
+        st.success(f"ONLINE | {vn} | {dur:.2f}s")
+        st.download_button("📥 WAV MASTER", aud, f"master_{int(time.time())}.wav")
+        st.download_button("📜 SRT SUBS", srt, f"subs_{int(time.time())}.srt")
     else:
-        st.info("AWAITING SIGNAL")
+        st.info("AWAITING SIGNAL...")
+
+    st.markdown("### 📊 PRO MIX GUIDE")
+    st.table({
+        "Output Goal": ["Gojo", "News Anchor", "Narrator", "Protagonist"],
+        "Mix / Voice": ["Onyx 70% + Sky 30%", "Bella 100%", "Michael 100%", "Sky 100%"],
+        "Tempo": ["1.05x", "1.0x", "0.9x", "1.1x"]
+    })
