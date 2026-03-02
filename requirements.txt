@@ -1,7 +1,7 @@
 streamlit
 kokoro-onnx==0.5.0
-numpy<2.0.0
-onnxruntime
+numpy>=2.0.2
+onnxruntime>=1.20.1
 soundfile
 pydub
 huggingface_hub
