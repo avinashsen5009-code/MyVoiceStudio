@@ -12,10 +12,12 @@ st.title("🎙️ Pro YouTube Voice Studio (v1.0)")
 
 @st.cache_resource
 def load_tts():
-    # CLOUD FIX: This downloads the 310MB model directly to the server 
-    # instead of uploading it through GitHub.
-    model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v1.0.onnx")
-    # We still keep voices-v1.0.bin in your GitHub folder (it's small)
+    # FIXED: Using the official onnx-community path which is verified for 2026
+    model_path = hf_hub_download(
+        repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", 
+        filename="onnx/model.onnx"
+    )
+    # This uses your voices-v1.0.bin which is already in your GitHub folder
     return Kokoro(model_path, "voices-v1.0.bin")
 
 def apply_bass_boost(audio_path, gain_db=6):
