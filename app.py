@@ -58,15 +58,17 @@ kokoro = load_engine()
 
 # --- 4. LAYOUT ---
 st.title("💎 AVINASH SEN VOICE STUDIO")
-st.caption("ULTIMATE 3D PRODUCTION • v13.0")
+st.caption("ULTIMATE 3D PRODUCTION • LOCAL IMAGE EDITION")
 
 l, m, r = st.columns([1, 1.4, 1])
 
 with l:
     st.subheader("🛡️ GUARDIAN")
-    # THE FIX: I converted your link to a Direct Image URL that Streamlit can read
-    gojo_img = "https://rukminim2.flixcart.com/image/850/1000/xif0q/poster/v/k/c/medium-satoru-gojo-jujutsu-kaisen-wall-poster-paper-print-original-imaggfayj6qyzg9z.jpeg"
-    st.image(gojo_img, caption="SATORU GOJO", use_container_width=True)
+    # THE LOCAL FIX: This looks for a file named gojo.jpg in your folder
+    try:
+        st.image("gojo.jpg", use_container_width=True)
+    except:
+        st.error("Error: 'gojo.jpg' not found in your folder. Please add the image!")
     
     st.session_state.theme = st.selectbox("ACTIVE THEME", ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"])
     
@@ -74,18 +76,15 @@ with l:
         "am_onyx": "🌑 Onyx (Deep)", "af_sky": "🎭 Sky (Energetic)", 
         "af_bella": "🎙️ Bella (News)", "am_adam": "🎬 Adam (Movie)",
         "af_heart": "💖 Heart (Soft)", "am_fenrir": "🐺 Fenrir (Gravelly)",
-        "am_michael": "👨‍🏫 Michael (Pro)", "af_sarah": "✨ Sarah (Gentle)"
     }
     
     mode = st.radio("VOICE ARCHITECTURE", ["Solo", "Fusion (Mix)"])
     if mode == "Solo":
         v_id = st.selectbox("IDENTITY", list(VOICES.keys()), format_func=lambda x: VOICES[x])
     else:
-        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=0) # Onyx
-        v2 = st.selectbox("Target Soul", list(VOICES.keys()), index=1) # Sky
+        v1 = st.selectbox("Base Soul", list(VOICES.keys()), index=0)
+        v2 = st.selectbox("Target Soul", list(VOICES.keys()), index=1)
         mix = st.slider("Mix Ratio", 0.0, 1.0, 0.75)
-    
-    speed = st.slider("TEMPO", 0.5, 2.0, 1.0)
 
 with m:
     st.subheader("📝 SCRIPT")
@@ -94,11 +93,11 @@ with m:
         if text.strip() and kokoro:
             with st.spinner("SYNETHESIZING..."):
                 if mode == "Solo":
-                    samples, sr = kokoro.create(text, voice=v_id, speed=speed, lang="en-us")
+                    samples, sr = kokoro.create(text, voice=v_id, speed=1.0, lang="en-us")
                 else:
                     s1, s2 = kokoro.get_voice_style(v1), kokoro.get_voice_style(v2)
                     blend = (s1 * (1 - mix)) + (s2 * mix)
-                    samples, sr = kokoro.create(text, voice=blend, speed=speed, lang="en-us")
+                    samples, sr = kokoro.create(text, voice=blend, speed=1.0, lang="en-us")
                 
                 buf = io.BytesIO()
                 sf.write(buf, samples, sr, format='WAV')
@@ -109,7 +108,6 @@ with r:
     if 'out' in st.session_state:
         aud, dur, original_text = st.session_state.out
         st.audio(aud, format="audio/wav")
-        st.success(f"ONLINE | {dur:.2f}s")
         st.download_button("📥 WAV MASTER", aud, "master.wav")
         
         # SRT GENERATION
@@ -117,6 +115,3 @@ with r:
         st.download_button("📜 SRT SUBS", srt, "subs.srt")
     else:
         st.info("AWAITING SIGNAL...")
-
-    st.markdown("### 📊 BEST MIX")
-    st.info("**Gojo:** Onyx (0.7) + Sky (0.3)")
