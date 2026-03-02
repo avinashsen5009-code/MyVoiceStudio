@@ -1,69 +1,65 @@
 import streamlit as st
 from kokoro_onnx import Kokoro
 import soundfile as sf
-import os
 import numpy as np
 from pydub import AudioSegment, effects
 from huggingface_hub import hf_hub_download
 import re
+import os
 
-# Page Config
 st.set_page_config(page_title="Pro YT Voice Studio", layout="wide")
-st.title("🎙️ Pro YouTube Voice Studio (v1.6 Final)")
+st.title("🎙️ Pro YouTube Voice Studio (v1.8 Cloud-Sync)")
 
 @st.cache_resource
-def load_tts_engine():
+def load_full_engine():
+    # 1. Download Model
     model_path = hf_hub_download(
         repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", 
         filename="onnx/model.onnx"
     )
-    # Ensure voices-v1.0.bin is in your main GitHub folder
-    return Kokoro(model_path, "voices-v1.0.bin")
+    # 2. Download Voices (This ensures you have the correct .bin file)
+    voices_path = hf_hub_download(
+        repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", 
+        filename="voices-v1.0.bin"
+    )
+    return Kokoro(model_path, voices_path)
 
-def master_audio(path, bass_db=6):
+def master_audio(path, bass_db=8):
     audio = AudioSegment.from_wav(path)
     audio = effects.normalize(audio)
     if bass_db > 0:
-        # High-end mastering: targets the deep chest frequencies
+        # Professional Bass-Boost for that "Big YouTuber" voice
         bass = audio.low_pass_filter(250).apply_gain(bass_db)
         audio = audio.overlay(bass)
     audio = effects.normalize(audio, headroom=0.1)
     audio.export(path, format="wav")
 
 try:
-    # Initialize Engine
-    tts = load_tts_engine()
+    # Initialize from Cloud
+    tts = load_full_engine()
     voice_list = sorted(tts.get_voices())
 
-    # Sidebar
     st.sidebar.header("🎛️ Studio Controls")
-    selected_voice = st.sidebar.selectbox("Select Voice", voice_list, index=0)
-    
-    st.sidebar.markdown("---")
+    sel_voice = st.sidebar.selectbox("Voice", voice_list, index=0)
     val_speed = st.sidebar.slider("Speed", 0.5, 2.0, 1.0, step=0.1)
     val_bass = st.sidebar.slider("Studio Bass", 0, 15, 8)
     
-    # Main
-    user_text = st.text_area("Your Script:", height=250, placeholder="Enter text here...")
+    user_text = st.text_area("Script:", height=250, placeholder="Paste your script here...")
 
-    if st.button("🚀 Generate Audio"):
+    if st.button("🚀 Generate Studio Audio"):
         if user_text.strip():
-            with st.spinner("🎙️ Processing..."):
-                # --- THE HARD-CODED FIX ---
-                # 1. Get the raw style vector from the .bin file
-                # 2. Force it to float32 using np.asarray
-                # 3. Use np.ascontiguousarray to ensure ONNX can read the memory
-                raw_style = tts.get_voice_style(selected_voice)
-                safe_style = np.ascontiguousarray(np.asarray(raw_style, dtype=np.float32))
+            with st.spinner("🎙️ Rendering Pro Audio..."):
+                # FORCE FLOAT32: This prevents the 'int32' error from coming back
+                raw_style = tts.get_voice_style(sel_voice)
+                safe_style = np.array(raw_style, dtype=np.float32)
 
-                # Split text into sentences to avoid memory errors
                 segments = re.split(r'([।\.!\?\n])', user_text)
                 audio_chunks = []
 
                 for part in segments:
                     if part.strip():
-                        # We pass the 'safe_style' vector instead of the voice name
-                        samples, sample_rate = tts.create(
+                        # We pass the float32 array directly to the engine
+                        samples, sr = tts.create(
                             part, 
                             voice=safe_style, 
                             speed=float(val_speed)
@@ -71,20 +67,17 @@ try:
                         audio_chunks.append(samples)
                 
                 if audio_chunks:
-                    final_samples = np.concatenate(audio_chunks)
-                    temp_out = "master_out.wav"
-                    sf.write(temp_out, final_samples, sample_rate)
+                    final_data = np.concatenate(audio_chunks)
+                    sf.write("out.wav", final_data, sr)
+                    master_audio("out.wav", val_bass)
                     
-                    # Apply Studio Mastering
-                    master_audio(temp_out, bass_db=val_bass)
-                    
-                    st.audio(temp_out)
-                    with open(temp_out, "rb") as f:
-                        st.download_button("📥 Download Voiceover", f, file_name="pro_voice.wav")
-                    st.success("✅ Voice Generated Successfully!")
+                    st.audio("out.wav")
+                    with open("out.wav", "rb") as f:
+                        st.download_button("📥 Download Voiceover", f, file_name="yt_master.wav")
+                    st.success("✅ Mastered Successfully!")
         else:
-            st.warning("Please type something first.")
+            st.warning("Please enter text.")
 
 except Exception as e:
-    st.error(f"❌ System Error: {str(e)}")
-    st.info("Check if voices-v1.0.bin is uploaded to your GitHub repository.")
+    st.error(f"⚠️ System Error: {str(e)}")
+    st.info("Tip: If the app hangs, click 'Manage App' -> 'Reboot' to refresh the engine.")
