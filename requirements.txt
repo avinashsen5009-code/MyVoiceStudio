@@ -1,0 +1,6 @@
+streamlit
+kokoro-onnx
+soundfile
+pydub
+numpy
+huggingface_hub
