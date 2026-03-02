@@ -82,7 +82,7 @@ with col_ctrl:
     
     # PASTE YOUR GOOGLE IMAGE LINK HERE
     # I've put a reliable Gojo link below as a default
-    gojo_url = "https://pin.it/fZ6SoZr4s"
+    gojo_url = "https://www.google.com/imgres?q=gojo&imgurl=https%3A%2F%2Frukminim2.flixcart.com%2Fimage%2F480%2F640%2Fxif0q%2Fposter%2Fd%2Fn%2Fj%2Fsmall-satoru-gojo-jujutsu-kaisen-wall-poster-asstore-red21-original-imahb3zppzmftams.jpeg%3Fq%3D90&imgrefurl=https%3A%2F%2Fwww.flipkart.com%2Fsatoru-gojo-jujutsu-kaisen-wall-poster-paper-print%2Fp%2Fitmfdd11d61340f1&docid=DZ1lh2VNYiFudM&tbnid=mFl0x2t9D2WJhM&vet=12ahUKEwiX1bHs54GTAxU1bPUHHVzmAt0QM3oECB8QAA..i&w=435&h=640&hcb=2&ved=2ahUKEwiX1bHs54GTAxU1bPUHHVzmAt0QM3oECB8QAA"
     st.image(gojo_url, caption="SATORU GOJO | THE STRONGEST", use_container_width=True)
     
     st.markdown("---")
