@@ -12,12 +12,12 @@ st.title("🎙️ Pro YouTube Voice Studio (v1.0)")
 
 @st.cache_resource
 def load_tts():
-    # FIXED: Using the official onnx-community path which is verified for 2026
+    # FIXED: Using the official onnx-community path for 2026 compatibility
     model_path = hf_hub_download(
         repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", 
         filename="onnx/model.onnx"
     )
-    # This uses your voices-v1.0.bin which is already in your GitHub folder
+    # This uses your voices-v1.0.bin which must be in your GitHub folder
     return Kokoro(model_path, "voices-v1.0.bin")
 
 def apply_bass_boost(audio_path, gain_db=6):
@@ -74,14 +74,17 @@ try:
         if st.button("🚀 Generate Pro Voiceover"):
             if text:
                 with st.spinner("Processing High-Quality Audio..."):
-                    # Step 1: Handle Blending Logic
+                    # Step 1: Handle Blending Logic with float32 conversion
                     if enable_blend:
                         v1 = tts.get_voice_style(main_voice)
                         v2 = tts.get_voice_style(blend_voice)
-                        mixed_style = v1 * (1 - ratio) + v2 * ratio
+                        # FIXED: Ensure result is float32 for the ONNX model
+                        mixed_style = (v1 * (1 - ratio) + v2 * ratio).astype(np.float32)
                         samples, sample_rate = tts.create(text, voice=mixed_style, speed=speed)
                     else:
-                        samples, sample_rate = tts.create(text, voice=main_voice, speed=speed)
+                        # FIXED: Convert single voice to float32 to avoid Tensor Error
+                        style = tts.get_voice_style(main_voice).astype(np.float32)
+                        samples, sample_rate = tts.create(text, voice=style, speed=speed)
                     
                     # Step 2: Save Temporary File
                     temp_file = "yt_output.wav"
