@@ -1,6 +1,6 @@
 import streamlit as st
 import whisper
-import moviepy.editor as mp
+import moviepy as mp
 import subprocess
 import os
 import re
@@ -8,6 +8,7 @@ import numpy as np
 import io
 import soundfile as sf
 from datetime import timedelta
+from huggingface_hub import hf_hub_download
 
 # --- 1. STUDIO ENGINE CONFIG ---
 st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
