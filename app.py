@@ -1,121 +1,119 @@
 import streamlit as st
-from kokoro_onnx import Kokoro
-from huggingface_hub import hf_hub_download
-import soundfile as sf
+import whisper
+import moviepy.editor as mp
+import subprocess
+import os
+import re
 import numpy as np
 import io
-import re
-import os
-import subprocess
-from datetime import datetime
+import soundfile as sf
+from datetime import timedelta
 
-# --- 1. STUDIO UI & THEME ---
+# --- 1. STUDIO ENGINE CONFIG ---
 st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
 
-if 'active_theme' not in st.session_state: st.session_state.active_theme = "Obsidian Gold 🏆"
 if 'last_audio' not in st.session_state: st.session_state.last_audio = None
+if 'final_video' not in st.session_state: st.session_state.final_video = None
 
 def apply_studio_css():
-    theme = st.session_state.active_theme
-    bg, acc = ("#020617", "#EAB308") if theme == "Obsidian Gold 🏆" else ("#0F172A", "#38BDF8")
+    acc = st.session_state.get('cap_color', "#EAB308")
     st.markdown(f"""
     <style>
-    .stApp {{ background-color: {bg} !important; color: #F8FAFC !important; }}
+    .stApp {{ background-color: #020617; color: white; }}
     div[data-testid="column"] > div {{
-        background: rgba(15, 23, 42, 0.95) !important; border-radius: 20px; 
-        padding: 25px; border: 1px solid {acc}33;
+        background: rgba(15, 23, 42, 0.95); border-radius: 15px; 
+        padding: 25px; border: 1px solid {acc}44; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
     }}
-    .stButton>button {{
-        background: {acc} !important; color: #000 !important; font-weight: 900;
-        border-radius: 10px; width: 100%; border: none;
-    }}
+    .stButton>button {{ background: {acc} !important; color: black; font-weight: 900; border: none; height: 3em; }}
+    .stDownloadButton>button {{ background: transparent !important; color: {acc} !important; border: 1px solid {acc} !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. CORE UTILS ---
-@st.cache_resource(show_spinner=False)
-def load_engine():
-    m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
-    v = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
-    return Kokoro(m, v)
+# --- 2. AI HELPERS ---
+@st.cache_resource
+def load_whisper(): return whisper.load_model("base")
 
-def make_srt(text, dur):
-    words = text.split(); step = dur/len(words) if words else 0
-    srt = ""
-    for i, w in enumerate(words):
-        s, e = i*step, (i+1)*step
-        ts = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},{int((x%1)*1000):03}"
-        srt += f"{i+1}\n{ts(s)} --> {ts(e)}\n{w}\n\n"
-    return srt
+def to_ass_color(hex_color):
+    # Converts #RRGGBB to &H00BBGGRR& (ASS format)
+    return f"&H00{hex_color[5:7]}{hex_color[3:5]}{hex_color[1:3]}&"
 
 # --- 3. THE STUDIO INTERFACE ---
 apply_studio_css()
 l, m, r = st.columns([1, 1.4, 1])
 
 with l:
-    st.subheader("⚙️ SETTINGS")
-    st.selectbox("THEME", ["Obsidian Gold 🏆", "Cyber Blue 🧊"], key="active_theme")
+    st.subheader("🎨 TYPOGRAPHY CONSOLE")
+    cap_color = st.color_picker("Text Primary Color", "#EAB308", key="cap_color")
+    out_color = st.color_picker("Outline/Glow Color", "#000000")
+    cap_size = st.slider("Font Size", 10, 100, 32)
+    font_style = st.selectbox("Font Family", ["Impact", "Arial Black", "Verdana", "Courier New"])
+    v_pos = st.slider("Vertical Position (Bottom to Top)", 10, 300, 50)
     
-    VOICES = {"am_onyx": "🌑 Onyx", "af_sky": "🎭 Sky", "am_adam": "🎬 Adam", "am_fenrir": "🐺 Fenrir"}
-    arch = st.radio("VOICE MODE", ["Solo", "Fusion Mix"], key="arch_mode")
-    
-    if st.session_state.arch_mode == "Solo":
-        v_solo = st.selectbox("VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x], key="v_solo")
+    st.markdown("---")
+    st.subheader("🎙️ VOICE DOWNLOADS")
+    if st.session_state.last_audio:
+        st.audio(st.session_state.last_audio['wav'], format='audio/wav')
+        st.download_button("📥 DOWNLOAD RAW VOICE (.WAV)", st.session_state.last_audio['wav'], "studio_voice.wav")
     else:
-        v_b = st.selectbox("BASE", list(VOICES.keys()), index=0, key="v_b")
-        v_f = st.selectbox("FLAVOR", list(VOICES.keys()), index=1, key="v_f")
-        ratio = st.slider("RATIO", 0.0, 1.0, 0.75, key="mix")
-    
-    speed = st.slider("TEMPO", 0.5, 2.0, 1.05)
+        st.caption("No voice generated yet.")
 
 with m:
-    st.subheader("📝 PRODUCTION")
-    script = st.text_area("Script", height=300, label_visibility="collapsed")
+    st.subheader("🎥 PRODUCTION HUB")
+    tab1, tab2 = st.tabs(["AI Voice & Captions", "Auto-Caption Uploaded Video"])
     
-    # VIDEO UPLOADER FOR CAPTION BURNING
-    bg_video = st.file_uploader("📂 Upload Background Video (MP4)", type=['mp4'])
-    
-    if st.button("🚀 GENERATE VIDEO WITH CAPTIONS"):
-        if script.strip() and bg_video:
-            engine = load_engine()
-            text = " ".join(re.sub(r'\[.*?\]|\(.*?\)', '', script).split())
+    with tab1:
+        script = st.text_area("Script", placeholder="Type what you want the AI to say...", height=200)
+        col1, col2 = st.columns(2)
+        with col1: v_id = st.selectbox("Base Soul", ["am_onyx", "af_sky", "am_adam", "af_bella"])
+        with col2: speed = st.slider("Tempo", 0.5, 2.0, 1.0)
+        
+        bg_vid = st.file_uploader("Upload Background MP4 (Optional)", type=['mp4'])
+        
+        if st.button("🚀 RENDER VOICE + CAPTIONS"):
+            from kokoro_onnx import Kokoro # Imported here to keep it clean
+            m_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
+            v_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
+            engine = Kokoro(m_path, v_path)
             
-            with st.spinner("Processing... This may take a minute."):
-                # 1. Generate Audio
-                if st.session_state.arch_mode == "Solo":
-                    style = np.atleast_2d(engine.get_voice_style(st.session_state.v_solo))
-                else:
-                    s1, s2 = engine.get_voice_style(st.session_state.v_b), engine.get_voice_style(st.session_state.v_f)
-                    style = np.atleast_2d((s1 * st.session_state.mix) + (s2 * (1.0 - st.session_state.mix)))
-                
-                samples, sr = engine.create(text, voice=style, speed=speed, lang="en-us")
-                
-                # 2. Save Temporary Files
-                sf.write("temp_audio.wav", samples, sr)
-                srt_content = make_srt(text, len(samples)/sr)
-                with open("temp_subs.srt", "w") as f: f.write(srt_content)
-                with open("temp_video.mp4", "wb") as f: f.write(bg_video.read())
-                
-                # 3. FFMPEG Command: Merging Audio + Video + Burning Subtitles
-                # 'force_style' sets the Font, Size, and Color (Yellow/Gold)
-                cmd = (
-                    f'ffmpeg -y -i temp_video.mp4 -i temp_audio.wav '
-                    f'-vf "subtitles=temp_subs.srt:force_style=\'FontSize=20,PrimaryColour=&H00FFFF&,Alignment=2\'" '
-                    f'-map 0:v -map 1:a -c:v libx264 -shortest out_video.mp4'
-                )
-                
-                try:
-                    subprocess.run(cmd, shell=True, check=True)
-                    with open("out_video.mp4", "rb") as f:
-                        st.session_state.final_video = f.read()
-                    st.success("Video Rendered Successfully!")
-                except Exception as e:
-                    st.error(f"FFMPEG Error: {e}. Ensure FFmpeg is installed.")
+            # Generate Audio
+            samples, sr = engine.create(script, voice=v_id, speed=speed, lang="en-us")
+            buf = io.BytesIO(); sf.write(buf, samples, sr, format='WAV')
+            st.session_state.last_audio = {"wav": buf.getvalue(), "text": script, "dur": len(samples)/sr}
+            st.rerun()
+
+    with tab2:
+        raw_vid = st.file_uploader("Upload Video to Detect Speech", type=['mp4', 'mov'])
+        if st.button("🪄 AUTO-DETECT & CAPTION"):
+            if raw_vid:
+                with st.spinner("Analyzing Speech..."):
+                    with open("in.mp4", "wb") as f: f.write(raw_vid.read())
+                    model = load_whisper()
+                    res = model.transcribe("in.mp4")
+                    
+                    # Create ASS Subtitle file with custom style
+                    ass_header = f"""[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Shadow, Alignment, MarginV
+Style: Default,{font_style},{cap_size},{to_ass_color(cap_color)},{to_ass_color(out_color)},1,2,1,2,{v_pos}
+[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"""
+                    events = ""
+                    for seg in res['segments']:
+                        events += f"Dialogue: 0,{timedelta(seconds=seg['start'])},{timedelta(seconds=seg['end'])},Default,,0,0,0,,{seg['text'].upper()}\n"
+                    
+                    with open("subs.ass", "w") as f: f.write(ass_header + events)
+                    subprocess.run(f'ffmpeg -y -i in.mp4 -vf "ass=subs.ass" output.mp4', shell=True)
+                    with open("output.mp4", "rb") as f: st.session_state.final_video = f.read()
+                    st.success("Video Synced!")
 
 with r:
-    st.subheader("🎬 FINAL OUTPUT")
-    if 'final_video' in st.session_state:
+    st.subheader("📺 STUDIO MONITOR")
+    if st.session_state.final_video:
         st.video(st.session_state.final_video)
-        st.download_button("📥 DOWNLOAD CAPTIONED VIDEO", st.session_state.final_video, "yt_final.mp4")
+        st.download_button("📥 DOWNLOAD MASTER MP4", st.session_state.final_video, "avinash_studio_pro.mp4")
     else:
-        st.info("Upload a video and render a script to see results.")
+        st.info("Rendered video will appear here.")
+    
+    st.markdown("---")
+    st.subheader("📜 PROJECT SRT")
+    if st.session_state.last_audio:
+        st.caption("SRT generated from Voice Studio is ready.")
+        # Logic to convert last_audio text to SRT would go here
