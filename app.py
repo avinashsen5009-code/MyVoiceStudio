@@ -7,49 +7,50 @@ import io
 import re
 from datetime import datetime
 
-# --- 1. PERFECTED OBSIDIAN GOLD THEME ---
+# --- 1. THEME ENGINE (FULL OVERRIDE) ---
 st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
 
+if 'active_theme' not in st.session_state: st.session_state.active_theme = "Obsidian Gold 🏆"
 if 'history' not in st.session_state: st.session_state.history = []
 if 'last_audio' not in st.session_state: st.session_state.last_audio = None
 
-def apply_perfect_theme(theme):
+def apply_full_theme():
+    theme = st.session_state.active_theme
     if theme == "Obsidian Gold 🏆":
-        # Deepest Midnight and True Gold
-        bg, acc, card, txt = "#020617", "#EAB308", "rgba(15, 23, 42, 0.98)", "#F8FAFC"
+        bg, acc, card, txt = "#020617", "#EAB308", "rgba(15, 23, 42, 0.95)", "#F8FAFC"
     elif theme == "Cyber Blue 🧊":
         bg, acc, card, txt = "#0F172A", "#38BDF8", "rgba(30, 41, 59, 0.9)", "#F1F5F9"
-    else: # Studio White
+    else: 
         bg, acc, card, txt = "#FFFFFF", "#2563EB", "#F1F5F9", "#0F172A"
     
     st.markdown(f"""
     <style>
-    .stApp {{ background: {bg}; color: {txt}; }}
-    /* Card Styling: Glassmorphism */
+    /* Full Page Override */
+    .stApp, [data-testid="stAppViewContainer"] {{ background-color: {bg} !important; color: {txt} !important; }}
+    [data-testid="stHeader"] {{ background: transparent !important; }}
+    [data-testid="stSidebar"] {{ background-color: {bg} !important; border-right: 1px solid {acc}22; }}
+    
+    /* Column Cards */
     div[data-testid="column"] > div {{
-        background: {card} !important; backdrop-filter: blur(30px);
-        border-radius: 12px; padding: 25px; border: 1px solid {acc}22;
-        box-shadow: 0 15px 60px rgba(0,0,0,0.9); margin-bottom: 20px;
+        background: {card} !important; backdrop-filter: blur(20px);
+        border-radius: 15px; padding: 25px; border: 1px solid {acc}33;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     }}
-    /* Gold Buttons */
+    
+    /* Global Text & Buttons */
+    h1, h2, h3, p, span, label {{ color: {txt} !important; }}
     .stButton>button {{
         background: {acc} !important; color: #000 !important;
-        font-weight: 800; border-radius: 6px; height: 50px;
-        border: none !important; width: 100%; text-transform: uppercase;
-        box-shadow: 0 0 15px {acc}33; transition: 0.3s;
+        font-weight: 800; border-radius: 8px; border: none !important;
     }}
-    .stButton>button:hover {{ box-shadow: 0 0 25px {acc}66; transform: translateY(-2px); }}
-    /* Text Inputs */
-    .stTextArea textarea {{ 
-        background: #000 !important; color: {acc} !important; 
-        border: 1px solid {acc}44 !important; font-size: 16px;
-    }}
-    /* Headers */
-    h1, h2, h3 {{ color: {acc}; font-weight: 800; letter-spacing: -1px; }}
+    .stTextArea textarea {{ background: #000 !important; color: {acc} !important; border: 1px solid {acc}44 !important; }}
+    
+    /* Fix for Selectbox/Radio labels */
+    div[data-baseweb="select"] > div {{ background-color: #000 !important; color: {txt} !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. ENGINE & LOGIC ---
+# --- 2. FAIL-SAFE ENGINE ---
 @st.cache_resource(show_spinner=False)
 def load_engine():
     m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
@@ -68,76 +69,73 @@ def make_srt(text, dur):
         srt += f"{i+1}\n{ts(s)} --> {ts(e)}\n{w}\n\n"
     return srt
 
-# --- 3. THE STUDIO ---
+# --- 3. THE STUDIO INTERFACE ---
+apply_full_theme()
 l, m, r = st.columns([1, 1.4, 1])
 
 with l:
-    st.subheader("⚙️ CONTROL PANEL")
-    t_choice = st.selectbox("ACTIVE THEME", ["Obsidian Gold 🏆", "Cyber Blue 🧊", "Studio White 💼"])
-    apply_perfect_theme(t_choice)
+    st.subheader("⚙️ SETTINGS")
+    # Theme with instant refresh
+    st.selectbox("THEME", ["Obsidian Gold 🏆", "Cyber Blue 🧊", "Studio White 💼"], 
+                 key="active_theme")
     
     try:
         st.image("gojo.jpg", use_container_width=True)
     except:
-        st.caption("Add gojo.jpg to folder for avatar.")
+        st.caption("Gojo Image Missing")
 
     st.markdown("---")
-    VOICES = {
-        "am_onyx": "🌑 Onyx (Deep)", "af_sky": "🎭 Sky (Anime)", 
-        "am_adam": "🎬 Adam (Cinema)", "am_fenrir": "🐺 Fenrir (Gravel)",
-        "af_bella": "🎙️ Bella (Pro)", "am_michael": "👨‍🏫 Michael (Clear)"
-    }
+    VOICES = {"am_onyx": "🌑 Onyx (Deep)", "af_sky": "🎭 Sky (Anime)", "am_adam": "🎬 Adam", "am_fenrir": "🐺 Fenrir", "af_bella": "🎙️ Bella", "am_michael": "👨‍🏫 Michael"}
     
-    # RESTORED: Mode Selection (Single vs Fusion)
-    arch_mode = st.radio("VOICE MODE", ["Solo Voice", "Fusion Mix"])
+    # Mode selection with instant refresh
+    arch = st.radio("VOICE ARCHITECTURE", ["Solo Identity", "Fusion Mix"], key="arch_mode")
     
-    if arch_mode == "Solo Voice":
-        v_primary = st.selectbox("SELECT VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x])
+    if st.session_state.arch_mode == "Solo Identity":
+        v_main = st.selectbox("SELECT VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x], key="v_solo")
     else:
-        v_primary = st.selectbox("BASE VOICE", list(VOICES.keys()), index=0, format_func=lambda x: VOICES[x])
-        v_secondary = st.selectbox("FUSION FLAVOR", list(VOICES.keys()), index=1, format_func=lambda x: VOICES[x])
-        fusion_val = st.slider("MIX RATIO", 0.0, 1.0, 0.70)
-    
+        v_base = st.selectbox("BASE SOUL", list(VOICES.keys()), index=0, format_func=lambda x: VOICES[x], key="v_base")
+        v_flavor = st.selectbox("FLAVOR SOUL", list(VOICES.keys()), index=1, format_func=lambda x: VOICES[x], key="v_flavor")
+        f_ratio = st.slider("FUSION RATIO", 0.0, 1.0, 0.75, key="mix_val")
+
     speed = st.slider("TEMPO", 0.5, 2.0, 1.05)
 
 with m:
-    st.subheader("📝 YOUTUBE SCRIPT")
-    raw_script = st.text_area("", placeholder="Paste script here...", height=430, label_visibility="collapsed")
+    st.subheader("📝 PRODUCTION")
+    script = st.text_area("", placeholder="Enter your script...", height=440, label_visibility="collapsed")
     
-    if st.button("🚀 RENDER FINAL AUDIO"):
-        if raw_script.strip():
+    if st.button("🚀 RENDER FINAL"):
+        if script.strip():
             engine = load_engine()
-            clean_txt = clean_script(raw_script)
-            
-            with st.spinner("Processing Void..."):
+            txt = clean_script(script)
+            with st.spinner("Synthesizing..."):
                 try:
-                    if arch_mode == "Solo Voice":
-                        style = engine.get_voice_style(v_primary)
+                    if st.session_state.arch_mode == "Solo Identity":
+                        style = engine.get_voice_style(st.session_state.v_solo)
                     else:
-                        s1, s2 = engine.get_voice_style(v_primary), engine.get_voice_style(v_secondary)
-                        style = (s1 * fusion_val) + (s2 * (1.0 - fusion_val))
+                        s1 = engine.get_voice_style(st.session_state.v_base)
+                        s2 = engine.get_voice_style(st.session_state.v_flavor)
+                        style = (s1 * st.session_state.mix_val) + (s2 * (1.0 - st.session_state.mix_val))
                     
                     style = np.atleast_2d(style)
-                    samples, sr = engine.create(clean_txt, voice=style, speed=speed, lang="en-us")
+                    samples, sr = engine.create(txt, voice=style, speed=speed, lang="en-us")
                     
                     buf = io.BytesIO(); sf.write(buf, samples, sr, format='WAV')
-                    dur = len(samples)/sr
-                    st.session_state.last_audio = {"wav": buf.getvalue(), "srt": make_srt(clean_txt, dur), "dur": dur}
-                    st.session_state.history.append({"time": datetime.now().strftime("%H:%M"), "text": clean_txt[:20]})
+                    st.session_state.last_audio = {"wav": buf.getvalue(), "srt": make_srt(txt, len(samples)/sr), "dur": len(samples)/sr}
+                    st.session_state.history.append({"time": datetime.now().strftime("%H:%M"), "text": txt[:20]})
                 except Exception as e:
-                    st.error(f"Render Error: {e}")
+                    st.error(f"Error: {e}")
 
 with r:
     st.subheader("🎧 MONITOR")
     if st.session_state.last_audio:
         aud = st.session_state.last_audio
         st.audio(aud['wav'])
-        st.download_button("📥 WAV MASTER", aud['wav'], "yt_master.wav")
-        st.download_button("📜 SRT SUBS", aud['srt'], "yt_subs.srt")
-        st.success(f"DUR: {aud['dur']:.2f}s")
+        st.download_button("📥 WAV", aud['wav'], "master.wav")
+        st.download_button("📜 SRT", aud['srt'], "subs.srt")
+        st.success(f"READY | {aud['dur']:.2f}s")
     else:
-        st.info("Awaiting Signal...")
+        st.info("Idle...")
 
-    st.subheader("🕒 HISTORY")
+    st.subheader("🕒 LOGS")
     for h in st.session_state.history[-5:]:
         st.caption(f"✅ {h['time']} - {h['text']}...")
