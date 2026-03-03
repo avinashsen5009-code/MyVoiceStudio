@@ -1,104 +1,104 @@
 import streamlit as st
-import subprocess
+import asyncio
+import edge_tts
 import whisper
 import os
 import random
-import numpy as np
+import subprocess
 import soundfile as sf
-from huggingface_hub import hf_hub_download
-from kokoro_onnx import Kokoro
+from datetime import timedelta
 
-# --- 1. CORE ENGINE ---
-st.set_page_config(page_title="Avinash Sen: Reality Studio", layout="wide")
+# --- 1. SETUP & UTILS ---
+st.set_page_config(page_title="Avinash Sen: Neural Studio", layout="wide")
 
 def hex_to_ass(hex_color):
     hex_color = hex_color.lstrip('#')
     return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
 
 @st.cache_resource
-def init_tools():
-    m_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
-    v_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
-    return Kokoro(m_path, v_path), whisper.load_model("base")
+def load_whisper():
+    return whisper.load_model("base")
 
-kokoro, whisper_engine = init_tools()
+whisper_engine = load_whisper()
 
-# --- 2. THE REALISM CONTROLS ---
-st.sidebar.title("🧬 Neural Humanizer")
+# --- 2. SIDEBAR: NEURAL VOICE SELECTION ---
+st.sidebar.title("🎙️ Microsoft Neural Voices")
+st.sidebar.info("These voices use Deep Learning for 99% human realism.")
 
-# Native Hindi/Hinglish Models
-hindi_models = {"hm_omega": "Deep Male", "hm_psi": "Soft Male", "hf_alpha": "Clear Female", "hf_beta": "Warm Female"}
-base_v = st.sidebar.selectbox("Base Human Model", list(hindi_models.keys()))
+# The best Hindi Neural Voices available
+voices_dict = {
+    "hi-IN-MadhurNeural": "Madhur (Deep Male - Best for Sigma/News)",
+    "hi-IN-SwararaNeural": "Swarara (Smooth Female - Best for Vlogs)",
+    "en-IN-PrabhatNeural": "Prabhat (Indian English Male)",
+    "en-IN-NeerjaNeural": "Neerja (Indian English Female)"
+}
 
-# THE REALISM SLIDERS
-st.sidebar.subheader("🎚️ ElevenLabs Simulation")
-emotion_depth = st.sidebar.slider("Emotional Pitch (Non-Robot)", 0.0, 0.20, 0.05, help="Higher = less robotic, more 'swing' in voice.")
-breath_pause = st.sidebar.slider("Natural Breath Gaps", 0.1, 1.0, 0.4)
-v_speed = st.sidebar.slider("Speech Speed", 0.8, 1.3, 1.05)
+selected_voice = st.sidebar.selectbox("Select Native Voice", list(voices_dict.keys()), format_func=lambda x: voices_dict[x])
+v_pitch = st.sidebar.slider("Voice Pitch", -20, 20, 0)
+v_rate = st.sidebar.slider("Speech Speed %", -20, 20, 0)
 
-# CAPTION STYLE
-st.sidebar.subheader("✍️ Caption Design")
-t_color = st.sidebar.color_picker("Text Color", "#00FF00")
-t_size = st.sidebar.slider("Font Size", 20, 100, 65)
+# Caption Customization (Restored)
+st.sidebar.subheader("🎨 Caption Style")
+t_color = st.sidebar.color_picker("Text Color", "#FFD700") # Gold
+t_size = st.sidebar.slider("Font Size", 20, 100, 50)
+cap_task = st.sidebar.selectbox("Caption Language", ["English Translation", "Original Hindi/Hinglish"])
 
-# --- 3. MAIN DASHBOARD ---
-st.title("🎙️ Avinash Sen Elite Studio")
+# --- 3. THE GENERATOR FUNCTION ---
+async def generate_voice(text, voice, pitch, rate):
+    # Adjusting pitch/rate for Edge-TTS format
+    p_str = f"{pitch:+}Hz"
+    r_str = f"{rate:+}%"
+    communicate = edge_tts.Communicate(text, voice, pitch=p_str, rate=r_str)
+    await communicate.save("speech.mp3")
+
+# --- 4. MAIN INTERFACE ---
+st.title("🎬 High-End Hindi Video Studio")
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("1. Realistic Scripting")
-    # PRO TIP: Use commas and dots for 'ElevenLabs' style pauses
-    raw_script = st.text_area("Script (Hindi/Hinglish):", 
-        "Suno... kya tumne kabhi socha hai? Ki sach kya hai. Yeh duniya... bohot ajeeb hai doston.")
+    st.subheader("1. Script (Type in Hindi or Hinglish)")
+    script = st.text_area("Your Script:", "Namaste doston! Aaj hum AI ki duniya mein ek naya kadam uthayenge. Kya aap taiyaar hain?")
     
-    cap_lang = st.radio("Translate Captions?", ["No (Hinglish)", "Yes (English)"], horizontal=True)
-
-    if st.button("🔥 Generate Realistic Voice"):
-        with st.spinner("Processing Human Phonetics..."):
-            # GET STYLE
-            style = kokoro.get_voice_style(base_v)
+    if st.button("🎙️ Generate Human Voice"):
+        with st.spinner("Synthesizing Neural Speech..."):
+            asyncio.run(generate_voice(script, selected_voice, v_pitch, v_rate))
+            st.audio("speech.mp3")
             
-            # THE SECRET SAUCE: Dynamic DNA
-            # Instead of a fixed voice, we add 'Vocal Shimmer'
-            vocal_shimmer = np.random.normal(0, emotion_depth, style.shape).astype(np.float32)
-            humanized_style = style + vocal_shimmer
+        with st.spinner("Creating Dynamic Typo Captions..."):
+            # Whisper Transcribe/Translate
+            task = "translate" if cap_task == "English Translation" else "transcribe"
+            result = whisper_engine.transcribe("speech.mp3", task=task, word_timestamps=True)
             
-            # GENERATE WITH GAPS
-            samples, sr = kokoro.create(raw_script, voice=humanized_style, speed=v_speed)
-            sf.write("speech.wav", samples, sr)
-            
-        with st.spinner("Analyzing Voice for Typo Captions..."):
-            task = "translate" if cap_lang == "Yes (English)" else "transcribe"
-            result = whisper_engine.transcribe("speech.wav", task=task, word_timestamps=True)
-            
-            # ASS HEADER (Typo Style)
+            # ASS Header
             ass_h = f"[Script Info]\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV\nStyle: Default,Arial,{t_size},{hex_to_ass(t_color)},&H00000000,1,3,2,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
             
-            ass_lines = []
+            lines = []
             for seg in result['segments']:
                 for word in seg['words']:
                     s, e = word['start'], word['end']
                     t_in = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}"
                     t_out = f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
                     
-                    # TYPO LOGIC: Words pop and bounce
+                    # TYPO ANIMATION
                     clean_w = word['word'].strip().upper()
-                    # Random jitter for position so it feels high-energy
-                    x, y = random.randint(300, 340), random.randint(170, 190)
-                    ass_lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx130\\fscy130)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
+                    x, y = 320 + random.randint(-15, 15), 180 + random.randint(-10, 10)
+                    # Flash & Zoom effect
+                    lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx125\\fscy125)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
 
-            with open("typo.ass", "w", encoding="utf-8") as f: f.write(ass_h + "\n".join(ass_lines))
-            st.audio("speech.wav")
-            st.success("Voice is now Humanized & Unique.")
+            with open("typo.ass", "w", encoding="utf-8") as f:
+                f.write(ass_h + "\n".join(lines))
+            st.success("Audio & Subtitles Ready!")
 
 with col2:
-    st.subheader("2. Final Video")
-    bg_vid = st.file_uploader("Upload Background", type=["mp4"])
-    if bg_vid and st.button("🎥 Render Viral Edit"):
-        with st.spinner("Merging..."):
-            with open("bg.mp4", "wb") as f: f.write(bg_vid.getbuffer())
-            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "speech.wav", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "final.mp4"]
+    st.subheader("2. Video Rendering")
+    bg_video = st.file_uploader("Upload Background", type=["mp4"])
+    if bg_video and st.button("🎥 Render Final Viral Video"):
+        with st.spinner("Merging Audio + Dynamic Captions..."):
+            with open("bg.mp4", "wb") as f: f.write(bg_video.getbuffer())
+            # FFmpeg: High Quality Render
+            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "speech.mp3", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"]
             subprocess.run(cmd)
-            st.video("final.mp4")
-            with open("final.mp4", "rb") as f: st.download_button("📥 Download", f, "viral_video.mp4")
+            st.video("output.mp4")
+            with open("output.mp4", "rb") as f:
+                st.download_button("📥 Download MP4", f, "final_hindi_reel.mp4")
