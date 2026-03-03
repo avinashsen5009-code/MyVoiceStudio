@@ -1,7 +1,9 @@
 streamlit
-kokoro-onnx==0.5.0
-numpy>=2.0.2
-onnxruntime>=1.20.1
+openai-whisper
+moviepy
+ffmpeg-python
 soundfile
-pydub
+kokoro-onnx
 huggingface_hub
+numpy
+torch
