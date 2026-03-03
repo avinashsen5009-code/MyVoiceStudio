@@ -2,141 +2,145 @@ import streamlit as st
 from kokoro_onnx import Kokoro
 from huggingface_hub import hf_hub_download
 import soundfile as sf
+import numpy as np
 import io
 import re
 import time
 from datetime import datetime
 
-# --- 1. CORE SYSTEM ---
-st.set_page_config(page_title="VOICE STUDIO", layout="wide", page_icon="💎")
+# --- 1. CORE CONFIG & THEME ENGINE ---
+st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
 
+# Initialize Session States
 if 'history' not in st.session_state: st.session_state.history = []
 if 'last_audio' not in st.session_state: st.session_state.last_audio = None
-# Initialize theme state before anything loads
-if 'theme' not in st.session_state: st.session_state.theme = "Cyber 3D Gold 🧊"
+if 'active_theme' not in st.session_state: st.session_state.active_theme = "Cyber 3D Gold 🧊"
 
-# --- 2. SCRIPT CLEANER ---
-def clean_script(text):
-    cleaned = re.sub(r'\[.*?\]', '', text)
-    cleaned = re.sub(r'\(.*?\)', '', cleaned)
-    return " ".join(cleaned.split())
-
-# --- 3. INSTANT THEME ENGINE ---
-# Applied at the very top so changes reflect immediately
-def apply_theme():
-    theme = st.session_state.theme
+def apply_custom_theme():
+    theme = st.session_state.active_theme
     if theme == "Cyber 3D Gold 🧊":
         bg, acc, card, txt = "#0f172a", "#fbbf24", "rgba(30, 41, 59, 0.8)", "#f8fafc"
     elif theme == "Anime Pastel 🌸":
         bg, acc, card, txt = "#fff5f7", "#f06292", "rgba(255, 255, 255, 0.9)", "#4a148c"
-    else: 
+    else: # Minimalist Pro
         bg, acc, card, txt = "#f8fafc", "#1e40af", "#ffffff", "#1e293b"
     
     st.markdown(f"""
     <style>
-    .main {{ background: {bg}; color: {txt}; }}
-    div[data-testid="column"] > div {{
+    .stApp {{ background: {bg}; color: {txt}; }}
+    [data-testid="stVerticalBlock"] > div:has(div.stColumn) > div {{
         background: {card} !important; backdrop-filter: blur(15px);
         border-radius: 20px; padding: 25px; border: 1px solid {acc}33;
-        box-shadow: 10px 10px 30px rgba(0,0,0,0.5);
+        box-shadow: 10px 10px 30px rgba(0,0,0,0.4);
     }}
     .stButton>button {{
-        background: linear-gradient(135deg, {acc}, #f59e0b); color: black !important;
-        font-weight: 900; border-radius: 12px; height: 60px; border: none; width: 100%;
+        background: linear-gradient(135deg, {acc}, #f59e0b) !important; color: black !important;
+        font-weight: 900; border-radius: 12px; height: 55px; border: none !important; width: 100%;
     }}
+    .stTextArea textarea {{ background: #000 !important; color: {acc} !important; border: 1px solid {acc}33 !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-apply_theme()
-
-# --- 4. ENGINE LOADER ---
+# --- 2. FAIL-SAFE ENGINE & UTILS ---
 @st.cache_resource(show_spinner=False)
-def get_engine():
+def load_kokoro_engine():
     m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
     v = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
     return Kokoro(m, v)
 
-# --- 5. STUDIO INTERFACE ---
+def clean_script_pro(text):
+    text = re.sub(r'\[.*?\]|\(.*?\)', '', text)
+    return " ".join(text.split())
+
+def create_pro_srt(text, duration):
+    words = text.split()
+    if not words: return ""
+    per_word = duration / len(words)
+    srt_content = ""
+    for i, word in enumerate(words):
+        start, end = i * per_word, (i + 1) * per_word
+        ts = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},{int((x%1)*1000):03}"
+        srt_content += f"{i+1}\n{ts(start)} --> {ts(end)}\n{word}\n\n"
+    return srt_content
+
+# --- 3. UI LAYOUT ---
+apply_custom_theme()
 l, m, r = st.columns([1, 1.4, 1])
 
 with l:
     st.subheader("🛡️ STUDIO CONTROL")
-    
-    # THEME FIX: key="theme" links directly to session_state
-    st.selectbox("🎨 ACTIVE THEME", 
-                 ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"], 
-                 key="theme")
+    # Theme Selection with Callback for Instant Change
+    st.selectbox("🎨 ENVIRONMENT", ["Cyber 3D Gold 🧊", "Anime Pastel 🌸", "Minimalist Pro 💼"], 
+                 key="active_theme")
     
     try:
         st.image("gojo.jpg", use_container_width=True)
     except:
-        uploaded = st.file_uploader("Upload Profile Image", type=['jpg','png'])
+        uploaded = st.file_uploader("Upload Profile", type=['jpg','png'])
         if uploaded: st.image(uploaded, use_container_width=True)
-    
+
     st.markdown("---")
-    VOICES = {
-        "am_onyx": "🌑 Onyx (Deep)", "af_sky": "🎭 Sky (Anime)", 
-        "af_bella": "🎙️ Bella (Pro)", "am_adam": "🎬 Adam (Movie)",
-        "am_fenrir": "🐺 Fenrir (Gravelly)", "am_michael": "👨‍🏫 Michael (Tech)"
-    }
+    VOICES = {"am_onyx": "🌑 Onyx (Deep)", "af_sky": "🎭 Sky (Anime)", "af_bella": "🎙️ Bella", "am_adam": "🎬 Adam", "am_fenrir": "🐺 Fenrir", "am_michael": "👨‍🏫 Michael"}
     
-    # MIXING FIX: Restored full custom voice fusion
-    mode = st.radio("VOICE ARCHITECTURE", ["Solo Identity", "Custom Mix (Fusion)"])
-    if mode == "Custom Mix (Fusion)":
-        v1 = st.selectbox("Base Voice", list(VOICES.keys()), index=0, format_func=lambda x: VOICES[x])
-        v2 = st.selectbox("Target Voice", list(VOICES.keys()), index=1, format_func=lambda x: VOICES[x])
-        mix_ratio = st.slider("Base Ratio (%)", 0.0, 1.0, 0.75)
+    # Fusion Logic
+    mode = st.radio("ARCHITECTURE", ["Solo Identity", "Fusion (Gojo Mix)"])
+    if mode == "Fusion (Gojo Mix)":
+        v1, v2, mix_ratio = "am_onyx", "af_sky", 0.75
+        st.info("Gojo Mode: 75% Onyx / 25% Sky")
     else:
-        v_id = st.selectbox("SELECT VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x])
-    
+        v_id = st.selectbox("VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x])
+        mix_ratio = 1.0
+
     speed = st.slider("TEMPO", 0.5, 2.0, 1.05)
-    do_clean = st.checkbox("Clean Script (Auto-remove [Brackets])", value=True)
 
 with m:
-    st.subheader("📝 YOUTUBE PRODUCTION")
-    script = st.text_area("", placeholder="Paste your script here...", height=400, label_visibility="collapsed")
+    st.subheader("📝 PRODUCTION SCRIPT")
+    raw_script = st.text_area("", placeholder="Enter your script...", height=400, label_visibility="collapsed")
     
-    if st.button("🚀 RENDER MASTER AUDIO"):
-        if script.strip():
-            engine = get_engine()
-            final_text = clean_script(script) if do_clean else script
+    if st.button("🚀 RENDER MASTER"):
+        if raw_script.strip():
+            engine = load_kokoro_engine()
+            clean_text = clean_script_pro(raw_script)
             
-            with st.spinner("Synthesizing Clean Audio..."):
-                # Apply custom mix logic
-                if mode == "Custom Mix (Fusion)":
-                    s1, s2 = engine.get_voice_style(v1), engine.get_voice_style(v2)
-                    blend = (s1 * mix_ratio) + (s2 * (1.0 - mix_ratio))
-                    samples, sr = engine.create(final_text, voice=blend, speed=speed, lang="en-us")
-                else:
-                    samples, sr = engine.create(final_text, voice=v_id, speed=speed, lang="en-us")
-                
-                buf = io.BytesIO(); sf.write(buf, samples, sr, format='WAV')
-                dur = len(samples)/sr
-                
-                # Pro word-based SRT
-                words = final_text.split()
-                step = dur/len(words) if words else 0
-                srt = ""
-                for i, w in enumerate(words):
-                    s, e = i*step, (i+1)*step
-                    f = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},000"
-                    srt += f"{i+1}\n{f(s)} --> {f(e)}\n{w}\n\n"
-                
-                st.session_state.last_audio = {"wav": buf.getvalue(), "srt": srt, "dur": dur}
-                st.session_state.history.append({"time": datetime.now().strftime("%H:%M"), "text": final_text[:20]})
+            with st.spinner("Synthesizing..."):
+                try:
+                    # THE FIX: Fetch and Shape Voice Styles Correctely
+                    if mode == "Fusion (Gojo Mix)":
+                        s1, s2 = engine.get_voice_style("am_onyx"), engine.get_voice_style("af_sky")
+                        style = (s1 * 0.75) + (s2 * 0.25)
+                    else:
+                        style = engine.get_voice_style(v_id)
+                    
+                    # ERROR-FREE SHAPING: Ensures NumPy shape is always (1, 512)
+                    style = np.atleast_2d(style)
+                    
+                    samples, sr = engine.create(clean_text, voice=style, speed=speed, lang="en-us")
+                    
+                    # Export
+                    buf = io.BytesIO()
+                    sf.write(buf, samples, sr, format='WAV')
+                    duration = len(samples) / sr
+                    
+                    st.session_state.last_audio = {
+                        "wav": buf.getvalue(),
+                        "srt": create_pro_srt(clean_text, duration),
+                        "dur": duration
+                    }
+                    st.session_state.history.append({"time": datetime.now().strftime("%H:%M"), "text": clean_text[:20]})
+                except Exception as e:
+                    st.error(f"Engine Error: {e}")
 
 with r:
     st.subheader("🎧 MONITOR")
     if st.session_state.last_audio:
-        curr = st.session_state.last_audio
-        st.audio(curr['wav'], format="audio/wav")
-        st.success(f"Rendering Complete | {curr['dur']:.2f}s")
-        st.download_button("📥 DOWNLOAD WAV", curr['wav'], "yt_master.wav")
-        st.download_button("📜 DOWNLOAD SRT", curr['srt'], "yt_subs.srt")
+        aud = st.session_state.last_audio
+        st.audio(aud['wav'])
+        st.download_button("📥 DOWNLOAD WAV", aud['wav'], "master.wav")
+        st.download_button("📜 DOWNLOAD SRT", aud['srt'], "subs.srt")
+        st.success(f"DUR: {aud['dur']:.2f}s")
     else:
-        st.info("Awaiting script input...")
+        st.info("Idle...")
 
-    st.markdown("---")
-    st.subheader("🕒 HISTORY")
+    st.subheader("🕒 LOGS")
     for h in st.session_state.history[-5:]:
         st.caption(f"✅ {h['time']} - {h['text']}...")
