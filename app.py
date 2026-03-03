@@ -5,9 +5,10 @@ import whisper
 import os
 import random
 import subprocess
+import numpy as np
 
-# --- 1. SETUP ---
-st.set_page_config(page_title="Avinash Sen: Ultra Real Studio", layout="wide")
+# --- 1. CORE SETUP ---
+st.set_page_config(page_title="Avinash Sen: Reality Studio v17", layout="wide")
 
 def hex_to_ass(hex_color):
     hex_color = hex_color.lstrip('#')
@@ -19,82 +20,100 @@ def load_whisper():
 
 whisper_engine = load_whisper()
 
-# --- 2. SIDEBAR: THE REALISM DIALS ---
-st.sidebar.title("🧬 ElevenLabs Mode")
-st.sidebar.warning("Using SSML Injection for Human Emotions")
+# --- 2. SIDEBAR: THE REALISM ENGINE ---
+st.sidebar.title("🎙️ Human Voice Lab")
+st.sidebar.info("This engine uses Neural Prosody to avoid the robotic 'flat' sound.")
 
-voices_dict = {
-    "hi-IN-MadhurNeural": "Deep Male (Sigma/Boss)",
-    "hi-IN-SwararaNeural": "Smooth Female (Vlog/Story)"
+# High-Quality Native Hindi Models
+hindi_voices = {
+    "hi-IN-MadhurNeural": "Madhur (Deep Male - Studio Quality)",
+    "hi-IN-SwararaNeural": "Swarara (Smooth Female - Natural Flow)"
 }
 
-selected_voice = st.sidebar.selectbox("Voice Model", list(voices_dict.keys()), format_func=lambda x: voices_dict[x])
-emotion_level = st.sidebar.slider("Emotional Range (Pitch)", 0, 50, 25)
-pause_duration = st.sidebar.slider("Breath Gap (ms)", 100, 800, 400)
+selected_voice = st.sidebar.selectbox("Base Voice Model", list(hindi_voices.keys()), format_func=lambda x: hindi_voices[x])
 
-# Caption Customization
-st.sidebar.subheader("🎨 Typo Style")
-t_color = st.sidebar.color_picker("Text Color", "#00FF00") # Neon Green
-t_size = st.sidebar.slider("Font Size", 30, 100, 60)
+# HUMANIZERS
+st.sidebar.subheader("🧬 Vocal DNA")
+v_pitch = st.sidebar.slider("Vocal Depth (Pitch)", -10, 10, -2)
+v_speed = st.sidebar.slider("Speech Energy", 0.9, 1.2, 1.05)
+v_volume = st.sidebar.slider("Gain (Mic Intensity)", 0, 10, 5)
 
-# --- 3. THE "HUMANIZER" ENGINE (SSML) ---
-async def generate_human_voice(text, voice, emotion, gap):
-    # This turns plain text into 'Emotional SSML'
-    # It adds a pitch contour and a 'breath' pause after every comma/period
+# CAPTION STYLE (Restored & Enhanced)
+st.sidebar.subheader("🎨 Caption Style")
+t_color = st.sidebar.color_picker("Text Color", "#FFCC00") 
+t_size = st.sidebar.slider("Font Size", 30, 90, 60)
+cap_lang = st.sidebar.selectbox("Subtitle Type", ["English Translation", "Hinglish / Hindi"])
+
+# --- 3. THE "REAL-VOICE" ENGINE ---
+async def generate_pro_voice(text, voice, pitch, rate):
+    # We use SSML to force natural human breathing patterns
+    p_str = f"{pitch:+}Hz"
+    r_str = f"{(rate-1)*100:+}%"
+    
+    # Adding 'Breaths' (silence) at commas and periods
+    processed_text = text.replace(".", '<break time="700ms"/>').replace(",", '<break time="300ms"/>')
+    
     ssml = f"""
     <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='hi-IN'>
         <voice name='{voice}'>
-            <prosody pitch='+{emotion}Hz' rate='+5%' contour='(0%,+0%) (25%,+15%) (50%,-10%) (100%,+0%)'>
-                {text.replace(',', f'<break time="{gap}ms"/>').replace('.', f'<break time="{gap+200}ms"/>')}
+            <prosody pitch='{p_str}' rate='{r_str}'>
+                {processed_text}
             </prosody>
         </voice>
     </speak>
     """
     communicate = edge_tts.Communicate(ssml, voice)
-    await communicate.save("speech.mp3")
+    await communicate.save("raw_speech.mp3")
+    
+    # Use FFmpeg to add 'Studio Compression' (Makes it sound expensive)
+    # This removes the 'tinny' robot sound
+    cmd = ["ffmpeg", "-y", "-i", "raw_speech.mp3", "-af", "highpass=f=200,lowpass=f=3000,volume=1.5", "final_speech.mp3"]
+    subprocess.run(cmd)
 
 # --- 4. MAIN INTERFACE ---
-st.title("🎙️ Avinash Sen: Reality Engine")
+st.title("🎬 Avinash Sen: Ultra-Realistic Studio")
+st.markdown("---")
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("1. Script (Hindi/Hinglish)")
-    script = st.text_area("Your Script:", "Doston... kya aapne kabhi socha hai? Ki AI ek insaan ki tarah kaise bol sakta hai. Yeh kamaal hai.")
+    st.subheader("1. Enter Your Script")
+    # PRO TIP: Use Devanagari (Hindi letters) for the most realistic Indian accent
+    script = st.text_area("Write here:", "Namaste doston. Aaj main aapko dikhaunga... ki asli AI voice kaisi hoti hai.")
     
-    cap_lang = st.radio("Caption Language", ["English (Translated)", "Hinglish (Original)"], horizontal=True)
-
-    if st.button("🔥 Generate Non-Robotic Voice"):
-        with st.spinner("Injecting Vocal Shimmer & Breaths..."):
-            asyncio.run(generate_human_voice(script, selected_voice, emotion_level, pause_duration))
-            st.audio("speech.mp3")
+    if st.button("🔥 Generate Human Speech"):
+        with st.spinner("Processing Studio Audio..."):
+            asyncio.run(generate_pro_voice(script, selected_voice, v_pitch, v_speed))
+            st.audio("final_speech.mp3")
             
-        with st.spinner("Creating High-Energy Typo..."):
-            task = "translate" if cap_lang == "English (Translated)" else "transcribe"
-            result = whisper_engine.transcribe("speech.mp3", task=task, word_timestamps=True)
+        with st.spinner("Creating Typo Captions..."):
+            task = "translate" if cap_lang == "English Translation" else "transcribe"
+            result = whisper_engine.transcribe("final_speech.mp3", task=task, word_timestamps=True)
             
+            # ASS Formatting
             ass_h = f"[Script Info]\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV\nStyle: Default,Arial,{t_size},{hex_to_ass(t_color)},&H00000000,1,3,2,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
             
             lines = []
             for seg in result['segments']:
                 for word in seg['words']:
                     s, e = word['start'], word['end']
-                    t_in, t_out = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}", f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
+                    t_in = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}"
+                    t_out = f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
                     
-                    # TYPO: Dynamic Bounce & Random Position
+                    # TYPO: Random position + Bounce
                     clean_w = word['word'].strip().upper()
-                    x, y = 320 + random.randint(-20, 20), 180 + random.randint(-15, 15)
-                    lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx140\\fscy140)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
+                    x, y = 320 + random.randint(-10, 10), 180 + random.randint(-10, 10)
+                    lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx130\\fscy130)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
 
             with open("typo.ass", "w", encoding="utf-8") as f: f.write(ass_h + "\n".join(lines))
-            st.success("Humanized Audio & Typo Ready!")
+            st.success("Humanized Audio & Captions Ready!")
 
 with col2:
-    st.subheader("2. Final Render")
-    bg_video = st.file_uploader("Upload Video", type=["mp4"])
-    if bg_video and st.button("🎥 Render Viral Reel"):
-        with st.spinner("Merging..."):
+    st.subheader("2. Video Render")
+    bg_video = st.file_uploader("Upload Clip", type=["mp4"])
+    if bg_video and st.button("🎥 Render Final Video"):
+        with st.spinner("Hardcoding DNA..."):
             with open("bg.mp4", "wb") as f: f.write(bg_video.getbuffer())
-            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "speech.mp3", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"]
+            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "final_speech.mp3", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"]
             subprocess.run(cmd)
             st.video("output.mp4")
