@@ -5,16 +5,16 @@ import soundfile as sf
 import numpy as np
 import io
 import re
+import time
 from datetime import datetime
 
-# --- 1. PREMIUM THEME ENGINE ---
+# --- 1. STUDIO UI & DYNAMIC THEME ---
 st.set_page_config(page_title="AVINASH SEN STUDIO", layout="wide", page_icon="💎")
 
 if 'active_theme' not in st.session_state: st.session_state.active_theme = "Obsidian Gold 🏆"
-if 'history' not in st.session_state: st.session_state.history = []
 if 'last_audio' not in st.session_state: st.session_state.last_audio = None
 
-def apply_full_theme():
+def apply_studio_css():
     theme = st.session_state.active_theme
     if theme == "Obsidian Gold 🏆":
         bg, acc, card, txt = "#020617", "#EAB308", "rgba(15, 23, 42, 0.98)", "#F8FAFC"
@@ -25,126 +25,109 @@ def apply_full_theme():
     
     st.markdown(f"""
     <style>
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {{ background-color: {bg} !important; color: {txt} !important; }}
-    [data-testid="stSidebar"] {{ background-color: {bg} !important; border-right: 1px solid {acc}22; }}
+    .stApp, [data-testid="stAppViewContainer"] {{ background-color: {bg} !important; color: {txt} !important; }}
     div[data-testid="column"] > div {{
-        background: {card} !important; backdrop-filter: blur(25px);
-        border-radius: 15px; padding: 25px; border: 1px solid {acc}33;
-        box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+        background: {card} !important; border-radius: 20px; padding: 25px; 
+        border: 1px solid {acc}33; box-shadow: 0 0 30px {acc}11;
     }}
-    h1, h2, h3, p, span, label, .stMarkdown {{ color: {txt} !important; font-family: 'Inter', sans-serif; }}
     .stButton>button {{
-        background: {acc} !important; color: #000 !important;
-        font-weight: 800; border-radius: 8px; border: none !important; width: 100%;
-        transition: 0.3s;
+        background: {acc} !important; color: #000 !important; font-weight: 900;
+        border-radius: 10px; border: none; transition: 0.3s;
     }}
-    .stButton>button:hover {{ transform: scale(1.02); box-shadow: 0 0 20px {acc}44; }}
-    .stTextArea textarea {{ background: #000 !important; color: {acc} !important; border: 1px solid {acc}44 !important; }}
-    /* Dropdown/Selectbox Styling */
-    div[data-baseweb="select"] > div {{ background-color: #000 !important; color: {txt} !important; border: 1px solid {acc}22 !important; }}
+    /* DYNAMIC CAPTION BOX */
+    .caption-box {{
+        background: rgba(0,0,0,0.8); border: 2px solid {acc};
+        border-radius: 15px; padding: 20px; text-align: center;
+        min-height: 100px; display: flex; align-items: center; justify-content: center;
+        font-size: 24px; font-weight: 800; color: #fff; margin-top: 10px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }}
+    .highlight {{ color: {acc}; text-transform: uppercase; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. ENGINE & CORE LOGIC ---
+# --- 2. THE ENGINE ---
 @st.cache_resource(show_spinner=False)
 def load_engine():
     m = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
     v = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
     return Kokoro(m, v)
 
-def clean_script(text):
-    return " ".join(re.sub(r'\[.*?\]|\(.*?\)', '', text).split())
+def clean_txt(t): return " ".join(re.sub(r'\[.*?\]|\(.*?\)', '', t).split())
 
-def make_srt(text, dur):
-    words = text.split(); step = dur/len(words) if words else 0
-    srt = ""
-    for i, w in enumerate(words):
-        s, e = i*step, (i+1)*step
-        ts = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},{int((x%1)*1000):03}"
-        srt += f"{i+1}\n{ts(s)} --> {ts(e)}\n{w}\n\n"
-    return srt
-
-# --- 3. THE STUDIO INTERFACE ---
-apply_full_theme()
+# --- 3. STUDIO LAYOUT ---
+apply_studio_css()
 l, m, r = st.columns([1, 1.4, 1])
 
-# --- VOICE LIBRARY ---
-VOICES = {
-    "am_onyx": "🌑 Onyx (Deep/Dark)", "af_sky": "🎭 Sky (Energetic/Anime)", 
-    "am_adam": "🎬 Adam (Cinematic)", "am_fenrir": "🐺 Fenrir (Gravelly)",
-    "af_bella": "🎙️ Bella (Professional)", "am_michael": "👨‍🏫 Michael (Educational)",
-    "af_sarah": "✨ Sarah (Soft/Gentle)", "af_nicole": "📖 Nicole (Narrator)",
-    "af_heart": "💖 Heart (Emotional)", "am_puck": "⚡ Puck (Fast/Young)",
-    "af_aoede": "🎶 Aoede (Melodic/Calm)"
-}
+VOICES = {"am_onyx": "🌑 Onyx", "af_sky": "🎭 Sky", "am_adam": "🎬 Adam", "am_fenrir": "🐺 Fenrir", "af_bella": "🎙️ Bella", "am_michael": "👨‍🏫 Michael"}
 
 with l:
-    st.subheader("⚙️ SETTINGS")
-    st.selectbox("STUDIO THEME", ["Obsidian Gold 🏆", "Cyber Blue 🧊", "Studio White 💼"], key="active_theme")
+    st.subheader("⚙️ CONTROL")
+    st.selectbox("THEME", ["Obsidian Gold 🏆", "Cyber Blue 🧊", "Studio White 💼"], key="active_theme")
+    arch = st.radio("ARCHITECTURE", ["Solo", "Fusion"], key="arch_mode")
     
-    try: st.image("gojo.jpg", use_container_width=True)
-    except: st.caption("Gojo Avatar Offline")
-
-    st.markdown("---")
-    arch = st.radio("VOICE ARCHITECTURE", ["Solo Identity", "Fusion Mix"], key="arch_mode")
-    
-    if st.session_state.arch_mode == "Solo Identity":
-        v_main = st.selectbox("VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x], key="v_solo")
+    if st.session_state.arch_mode == "Solo":
+        v_solo = st.selectbox("VOICE", list(VOICES.keys()), format_func=lambda x: VOICES[x], key="v_solo")
     else:
-        v_base = st.selectbox("BASE SOUL", list(VOICES.keys()), index=0, format_func=lambda x: VOICES[x], key="v_base")
-        v_flavor = st.selectbox("FLAVOR SOUL", list(VOICES.keys()), index=1, format_func=lambda x: VOICES[x], key="v_flavor")
-        f_ratio = st.slider("FUSION RATIO", 0.0, 1.0, 0.75, key="mix_val")
-
+        v_b = st.selectbox("BASE", list(VOICES.keys()), index=0, key="v_b")
+        v_f = st.selectbox("FLAVOR", list(VOICES.keys()), index=1, key="v_f")
+        ratio = st.slider("RATIO", 0.0, 1.0, 0.75, key="mix")
+    
     speed = st.slider("TEMPO", 0.5, 2.0, 1.05)
 
 with m:
     st.subheader("📝 PRODUCTION")
-    script = st.text_area("", placeholder="Enter your script here...", height=420, label_visibility="collapsed")
+    script = st.text_area("", placeholder="Paste script...", height=350, label_visibility="collapsed")
     
-    if st.button("🚀 RENDER FINAL"):
+    if st.button("🚀 RENDER & SYNC"):
         if script.strip():
             engine = load_engine()
-            txt = clean_script(script)
-            with st.spinner("Processing Audio..."):
+            text = clean_txt(script)
+            with st.spinner("Processing..."):
                 try:
-                    if st.session_state.arch_mode == "Solo Identity":
-                        style = engine.get_voice_style(st.session_state.v_solo)
+                    if st.session_state.arch_mode == "Solo":
+                        style = np.atleast_2d(engine.get_voice_style(st.session_state.v_solo))
                     else:
-                        s1, s2 = engine.get_voice_style(st.session_state.v_base), engine.get_voice_style(st.session_state.v_flavor)
-                        style = (s1 * st.session_state.mix_val) + (s2 * (1.0 - st.session_state.mix_val))
+                        s1, s2 = engine.get_voice_style(st.session_state.v_b), engine.get_voice_style(st.session_state.v_f)
+                        style = np.atleast_2d((s1 * st.session_state.mix) + (s2 * (1.0 - st.session_state.mix)))
                     
-                    style = np.atleast_2d(style)
-                    samples, sr = engine.create(txt, voice=style, speed=speed, lang="en-us")
-                    
+                    samples, sr = engine.create(text, voice=style, speed=speed, lang="en-us")
                     buf = io.BytesIO(); sf.write(buf, samples, sr, format='WAV')
-                    st.session_state.last_audio = {"wav": buf.getvalue(), "srt": make_srt(txt, len(samples)/sr), "dur": len(samples)/sr}
-                    st.session_state.history.append({"time": datetime.now().strftime("%H:%M"), "text": txt[:20]})
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.session_state.last_audio = {"wav": buf.getvalue(), "text": text, "dur": len(samples)/sr}
+                except Exception as e: st.error(f"Error: {e}")
+
+    # --- DYNAMIC CAPTION PREVIEW ---
+    if st.session_state.last_audio:
+        st.markdown("### 📺 DYNAMIC PREVIEW")
+        cap_placeholder = st.empty()
+        words = st.session_state.last_audio["text"].split()
+        
+        if st.button("▶️ PLAY WITH CAPTIONS"):
+            st.audio(st.session_state.last_audio["wav"])
+            start_time = time.time()
+            total_dur = st.session_state.last_audio["dur"]
+            time_per_word = total_dur / len(words)
+            
+            for i, word in enumerate(words):
+                # Highlight logic
+                display_text = " ".join([f'<span class="highlight">{w}</span>' if idx == i else w for idx, w in enumerate(words[max(0, i-3):i+4])])
+                cap_placeholder.markdown(f'<div class="caption-box">... {display_text} ...</div>', unsafe_allow_html=True)
+                time.sleep(time_per_word)
+            cap_placeholder.markdown('<div class="caption-box">FINISHED</div>', unsafe_allow_html=True)
 
 with r:
     st.subheader("🎧 MONITOR")
     if st.session_state.last_audio:
         aud = st.session_state.last_audio
         st.audio(aud['wav'])
-        st.download_button("📥 WAV", aud['wav'], "master.wav")
-        st.download_button("📜 SRT", aud['srt'], "subs.srt")
-        st.success(f"READY | {aud['dur']:.2f}s")
+        st.download_button("📥 WAV MASTER", aud['wav'], "master.wav")
+        # Generate SRT for download
+        per_w = aud['dur']/len(words)
+        srt = ""
+        for i, w in enumerate(words):
+            s, e = i*per_w, (i+1)*per_w
+            ts = lambda x: f"{int(x//3600):02}:{int((x%3600)//60):02}:{int(x%60):02},000"
+            srt += f"{i+1}\n{ts(s)} --> {ts(e)}\n{w}\n\n"
+        st.download_button("📜 DOWNLOAD SRT", srt, "subs.srt")
     else:
-        st.info("Awaiting Render...")
-
-    st.markdown("---")
-    st.subheader("📈 YT STRATEGY")
-    st.markdown("""
-    | Channel Type | Recommended Mix |
-    | :--- | :--- |
-    | **Anime Lore** | Onyx (75%) + Sky (25%) |
-    | **Mystery/Horror**| Fenrir (80%) + Onyx (20%) |
-    | **Motivation** | Adam (70%) + Michael (30%) |
-    | **News/Recaps** | Bella (Solo) |
-    | **Storytelling** | Nicole (60%) + Sarah (40%) |
-    """)
-
-    st.subheader("🕒 LOGS")
-    for h in st.session_state.history[-3:]:
-        st.caption(f"✅ {h['time']} - {h['text']}...")
+        st.info("Render a script to see dynamic captions.")
