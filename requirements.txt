@@ -1,9 +1,5 @@
 streamlit
+edge-tts
 openai-whisper
-moviepy
-ffmpeg-python
 soundfile
-kokoro-onnx
-huggingface_hub
 numpy
-torch
