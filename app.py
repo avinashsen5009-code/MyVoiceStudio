@@ -14,9 +14,18 @@ st.set_page_config(page_title="Elite Production Studio", layout="wide")
 if 'history' not in st.session_state:
     st.session_state.history = []
 
+# Helper function for SRT timestamps (MOVED TO THE TOP)
+def format_timestamp(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    msecs = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{msecs:03d}"
+
 # --- 2. LOAD AI ENGINES ---
 @st.cache_resource
 def init_tools():
+# ... rest of your code stays the same ...
     m_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="kokoro-v1.0.onnx")
     v_path = hf_hub_download(repo_id="leonelhs/kokoro-thewh1teagle", filename="voices-v1.0.bin")
     return Kokoro(m_path, v_path), whisper.load_model("base")
