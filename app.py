@@ -1,119 +1,92 @@
 import streamlit as st
-import asyncio
-import edge_tts
-import whisper
 import os
 import random
 import subprocess
-import numpy as np
+from openai import OpenAI
+import whisper
 
-# --- 1. CORE SETUP ---
-st.set_page_config(page_title="Avinash Sen: Reality Studio v17", layout="wide")
+# --- 1. PRO SETUP ---
+st.set_page_config(page_title="Avinash Sen: 100% Human Studio", layout="wide")
 
 def hex_to_ass(hex_color):
     hex_color = hex_color.lstrip('#')
     return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
 
-@st.cache_resource
-def load_whisper():
-    return whisper.load_model("base")
+# --- 2. SIDEBAR: THE ELITE CONTROLS ---
+st.sidebar.title("💎 Elite Human Engine")
+api_key = st.sidebar.text_input("Enter OpenAI API Key:", type="password")
 
-whisper_engine = load_whisper()
-
-# --- 2. SIDEBAR: THE REALISM ENGINE ---
-st.sidebar.title("🎙️ Human Voice Lab")
-st.sidebar.info("This engine uses Neural Prosody to avoid the robotic 'flat' sound.")
-
-# High-Quality Native Hindi Models
-hindi_voices = {
-    "hi-IN-MadhurNeural": "Madhur (Deep Male - Studio Quality)",
-    "hi-IN-SwararaNeural": "Swarara (Smooth Female - Natural Flow)"
+# These models are trained on real human speech samples
+voice_options = {
+    "echo": "Deep Male (Smooth/Calm)",
+    "onyx": "Deep Male (Powerful/Sigma)",
+    "shimmer": "Clear Female (Energetic)",
+    "nova": "Warm Female (Professional)"
 }
 
-selected_voice = st.sidebar.selectbox("Base Voice Model", list(hindi_voices.keys()), format_func=lambda x: hindi_voices[x])
+selected_voice = st.sidebar.selectbox("Select Actor Voice", list(voice_options.keys()), format_func=lambda x: voice_options[x])
 
-# HUMANIZERS
-st.sidebar.subheader("🧬 Vocal DNA")
-v_pitch = st.sidebar.slider("Vocal Depth (Pitch)", -10, 10, -2)
-v_speed = st.sidebar.slider("Speech Energy", 0.9, 1.2, 1.05)
-v_volume = st.sidebar.slider("Gain (Mic Intensity)", 0, 10, 5)
+st.sidebar.subheader("🎨 Caption Designer")
+t_color = st.sidebar.color_picker("Text Color", "#00F2FF") # Neon Cyan
+t_size = st.sidebar.slider("Font Size", 30, 100, 60)
+cap_lang = st.sidebar.selectbox("Subtitle Language", ["English (Translated)", "Original (Hinglish/Hindi)"])
 
-# CAPTION STYLE (Restored & Enhanced)
-st.sidebar.subheader("🎨 Caption Style")
-t_color = st.sidebar.color_picker("Text Color", "#FFCC00") 
-t_size = st.sidebar.slider("Font Size", 30, 90, 60)
-cap_lang = st.sidebar.selectbox("Subtitle Type", ["English Translation", "Hinglish / Hindi"])
-
-# --- 3. THE "REAL-VOICE" ENGINE ---
-async def generate_pro_voice(text, voice, pitch, rate):
-    # We use SSML to force natural human breathing patterns
-    p_str = f"{pitch:+}Hz"
-    r_str = f"{(rate-1)*100:+}%"
-    
-    # Adding 'Breaths' (silence) at commas and periods
-    processed_text = text.replace(".", '<break time="700ms"/>').replace(",", '<break time="300ms"/>')
-    
-    ssml = f"""
-    <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='hi-IN'>
-        <voice name='{voice}'>
-            <prosody pitch='{p_str}' rate='{r_str}'>
-                {processed_text}
-            </prosody>
-        </voice>
-    </speak>
-    """
-    communicate = edge_tts.Communicate(ssml, voice)
-    await communicate.save("raw_speech.mp3")
-    
-    # Use FFmpeg to add 'Studio Compression' (Makes it sound expensive)
-    # This removes the 'tinny' robot sound
-    cmd = ["ffmpeg", "-y", "-i", "raw_speech.mp3", "-af", "highpass=f=200,lowpass=f=3000,volume=1.5", "final_speech.mp3"]
-    subprocess.run(cmd)
+# --- 3. THE "HUMAN" PERFORMANCE ENGINE ---
+def generate_elite_voice(api_key, text, voice):
+    client = OpenAI(api_key=api_key)
+    # Using 'tts-1-hd' for the highest possible bitrate/realism
+    response = client.audio.speech.create(
+        model="tts-1-hd",
+        voice=voice,
+        input=text
+    )
+    response.stream_to_file("speech.mp3")
 
 # --- 4. MAIN INTERFACE ---
-st.title("🎬 Avinash Sen: Ultra-Realistic Studio")
-st.markdown("---")
+st.title("🎙️ Avinash Sen: 100% Reality Studio")
+st.warning("🚀 This engine uses HD Neural models for zero robotic sound.")
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("1. Enter Your Script")
-    # PRO TIP: Use Devanagari (Hindi letters) for the most realistic Indian accent
-    script = st.text_area("Write here:", "Namaste doston. Aaj main aapko dikhaunga... ki asli AI voice kaisi hoti hai.")
+    st.subheader("1. Script (Hindi/Hinglish)")
+    script = st.text_area("Script:", "Doston... aaj main aapko ek aisi baat batane wala hoon, jo aapki zindagi badal degi. Believe me.")
     
-    if st.button("🔥 Generate Human Speech"):
-        with st.spinner("Processing Studio Audio..."):
-            asyncio.run(generate_pro_voice(script, selected_voice, v_pitch, v_speed))
-            st.audio("final_speech.mp3")
-            
-        with st.spinner("Creating Typo Captions..."):
-            task = "translate" if cap_lang == "English Translation" else "transcribe"
-            result = whisper_engine.transcribe("final_speech.mp3", task=task, word_timestamps=True)
-            
-            # ASS Formatting
-            ass_h = f"[Script Info]\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV\nStyle: Default,Arial,{t_size},{hex_to_ass(t_color)},&H00000000,1,3,2,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-            
-            lines = []
-            for seg in result['segments']:
-                for word in seg['words']:
-                    s, e = word['start'], word['end']
-                    t_in = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}"
-                    t_out = f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
-                    
-                    # TYPO: Random position + Bounce
-                    clean_w = word['word'].strip().upper()
-                    x, y = 320 + random.randint(-10, 10), 180 + random.randint(-10, 10)
-                    lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx130\\fscy130)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
+    if st.button("🔥 Generate 100% Human Voice"):
+        if not api_key:
+            st.error("Please enter your OpenAI API Key in the sidebar!")
+        else:
+            with st.spinner("Recording 'Real' Performance..."):
+                generate_elite_voice(api_key, script, selected_voice)
+                st.audio("speech.mp3")
+                
+            with st.spinner("Processing Viral Captions..."):
+                model = whisper.load_model("base")
+                task = "translate" if cap_lang == "English (Translated)" else "transcribe"
+                result = model.transcribe("speech.mp3", task=task, word_timestamps=True)
+                
+                ass_h = f"[Script Info]\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV\nStyle: Default,Arial,{t_size},{hex_to_ass(t_color)},&H00000000,1,3,2,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+                
+                lines = []
+                for seg in result['segments']:
+                    for word in seg['words']:
+                        s, e = word['start'], word['end']
+                        t_in = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}"
+                        t_out = f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
+                        
+                        clean_w = word['word'].strip().upper()
+                        x, y = 320 + random.randint(-15, 15), 180 + random.randint(-10, 10)
+                        lines.append(f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{\\pos({x},{y})\\t(0,100,\\fscx135\\fscy135)\\t(100,200,\\fscx100\\fscy100)}}{clean_w}")
 
-            with open("typo.ass", "w", encoding="utf-8") as f: f.write(ass_h + "\n".join(lines))
-            st.success("Humanized Audio & Captions Ready!")
+                with open("typo.ass", "w", encoding="utf-8") as f: f.write(ass_h + "\n".join(lines))
+                st.success("Human Performance Captured!")
 
 with col2:
-    st.subheader("2. Video Render")
-    bg_video = st.file_uploader("Upload Clip", type=["mp4"])
-    if bg_video and st.button("🎥 Render Final Video"):
-        with st.spinner("Hardcoding DNA..."):
-            with open("bg.mp4", "wb") as f: f.write(bg_video.getbuffer())
-            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "final_speech.mp3", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"]
+    st.subheader("2. Final Rendering")
+    video_file = st.file_uploader("Background Clip", type=["mp4"])
+    if video_file and st.button("🎥 Render Final Viral Video"):
+        with st.spinner("Burning DNA & Subtitles..."):
+            with open("bg.mp4", "wb") as f: f.write(video_file.getbuffer())
+            cmd = ["ffmpeg", "-y", "-i", "bg.mp4", "-i", "speech.mp3", "-vf", "ass=typo.ass", "-c:v", "libx264", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"]
             subprocess.run(cmd)
             st.video("output.mp4")
