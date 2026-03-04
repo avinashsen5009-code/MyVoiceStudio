@@ -5,123 +5,81 @@ import random
 import subprocess
 from pydub import AudioSegment
 
-# --- 1. CORE STUDIO CONFIG ---
-st.set_page_config(page_title="Avinash Sen: Chaos Captions", layout="wide")
+# --- 1. SETUP ---
+st.set_page_config(page_title="Avinash Sen: Fast Chaos", layout="wide")
 
-def hex_to_ass(hex_color):
-    """Converts #RRGGBB to ASS format &HBBGGRR"""
-    hex_color = hex_color.lstrip('#')
-    return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
-
+# FASTER MODEL: Changed 'base' to 'tiny' for speed
 @st.cache_resource
 def load_whisper():
-    return whisper.load_model("base")
+    return whisper.load_model("tiny") 
 
 whisper_engine = load_whisper()
 
-# --- 2. SIDEBAR: CHAOS & POWER SETTINGS ---
-st.sidebar.title("💎 Viral Chaos Engine")
+# --- 2. THE ERROR-PROOF SFX ENGINE ---
+def get_sfx():
+    try:
+        if os.path.exists("pop.wav"):
+            return AudioSegment.from_file("pop.wav") # Safer than .from_wav
+    except Exception:
+        return None
+    return None
 
-# Standard Styling
-font_size = st.sidebar.slider("Font Size", 30, 100, 65)
-main_color = st.sidebar.color_picker("Normal Text Color", "#FFFFFF") 
+# --- 3. THE STUDIO ---
+st.title("🌪️ Fast Hindi Caption Studio")
 
-# Highlight Styling
-st.sidebar.subheader("🔥 Power Word Highlight")
-highlight_color = st.sidebar.color_picker("Highlight Color", "#FF0055") # Neon Pink/Red
-power_words = st.sidebar.text_area("Keywords to Highlight (Comma separated):", 
-                                   "PAISA, GOAL, SUCCESS, ZINDAGI, WIN, AI, DOSTON")
+col1, col2 = st.columns(2)
 
-st.sidebar.subheader("🔊 Sound Effects")
-use_sfx = st.sidebar.checkbox("Play 'Pop' sound on Highlights", value=True)
-
-# --- 3. THE PROCESSING LOGIC ---
-st.title("🌪️ Random Hover & Pop Studio")
-st.info("Words will appear randomly anywhere, Pop in size, and Hover upwards!")
-
-uploaded_file = st.file_uploader("Upload your MP4", type=["mp4"])
+with col1:
+    uploaded_file = st.file_uploader("Upload Video", type=["mp4"])
+    # Keywords to trigger Pop Sound
+    power_words = st.text_input("Highlight Keywords (Comma separated):", "PAISA, GOAL, SUCCESS, ZINDAGI")
 
 if uploaded_file:
-    with open("temp_video.mp4", "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    st.video("temp_video.mp4")
+    if st.button("🚀 Start Fast Process"):
+        with st.spinner("Processing..."):
+            # Save Temp Video
+            with open("input.mp4", "wb") as f:
+                f.write(uploaded_file.getbuffer())
 
-    if st.button("✨ Generate Viral Chaos Captions"):
-        with st.spinner("AI is listening to your Hindi audio..."):
-            result = whisper_engine.transcribe("temp_video.mp4", word_timestamps=True)
+            # 1. Faster Transcription
+            result = whisper_engine.transcribe("input.mp4", word_timestamps=True)
             
-            # Extract main audio for SFX mixing
-            subprocess.run(["ffmpeg", "-y", "-i", "temp_video.mp4", "-q:a", "0", "-map", "a", "main_audio.wav"])
-            main_audio = AudioSegment.from_wav("main_audio.wav")
+            # 2. SFX Logic (Error Proof)
+            pop_sfx = get_sfx()
+            subprocess.run(["ffmpeg", "-y", "-i", "input.mp4", "-q:a", "0", "-map", "a", "audio.wav"])
+            main_audio = AudioSegment.from_wav("audio.wav")
             
-            # Load the SFX (You need a pop.wav file in your folder)
-            if use_sfx and os.path.exists("pop.wav"):
-                pop_sfx = AudioSegment.from_wav("pop.wav")
-            else:
-                pop_sfx = None
+            # 3. Build Animated Captions (Chaos Mode)
+            ass_header = "[Script Info]\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV\nStyle: Default,Arial,50,&H00FFFFFF,&H00000000,1,2,2,20\nStyle: High,Arial,65,&H0000FFFF,&H00000000,1,3,2,20\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
             
-        with st.spinner("Building Random Position & Hover Layers..."):
-            ass_header = f"""[Script Info]
-ScriptType: v4.00+
-PlayResX: 640
-PlayResY: 360
+            lines = []
+            highlights = [w.strip().upper() for w in power_words.split(",")]
 
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV
-Style: Default,Arial,{font_size},{hex_to_ass(main_color)},&H00000000,1,2,2,20
-Style: Highlight,Impact,{font_size + 15},{hex_to_ass(highlight_color)},&H00000000,1,3,2,20
-"""
-            events_header = "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-            
-            ass_lines = []
-            highlight_list = [w.strip().upper() for w in power_words.split(",")]
-
-            for segment in result['segments']:
-                for word in segment['words']:
+            for seg in result['segments']:
+                for word in seg['words']:
                     start, end = word['start'], word['end']
-                    clean_w = word['word'].strip().upper().replace('.', '').replace(',', '')
+                    clean_w = word['word'].strip().upper()
                     
-                    def format_time(t):
-                        return f"{int(t//3600):01}:{int((t%3600)//60):02}:{t%60:05.2f}"
+                    # Timing for SFX
+                    if any(h in clean_w for h in highlights) and pop_sfx:
+                        main_audio = main_audio.overlay(pop_sfx, position=int(start*1000))
+                        style = "High"
+                    else:
+                        style = "Default"
 
-                    t_s, t_e = format_time(start), format_time(end)
+                    # THE VISUAL CHAOS (Random + Pop + Hover)
+                    x, y = random.randint(100, 540), random.randint(80, 280)
+                    # \move makes it hover, \t makes it pop
+                    anim = f"{{\\move({x},{y},{x},{y-30})\\t(0,100,\\fscx150\\fscy150)\\t(100,200,\\fscx100\\fscy100)}}"
                     
-                    # Highlight & SFX Logic
-                    is_highlight = any(hw in clean_w for hw in highlight_list)
-                    current_style = "Highlight" if is_highlight else "Default"
-                    
-                    if is_highlight and pop_sfx:
-                        # Overlay the pop sound at the exact millisecond the word appears
-                        insert_pos = int(start * 1000) 
-                        main_audio = main_audio.overlay(pop_sfx, position=insert_pos)
+                    t_s = f"{int(start//3600)}:{int((start%3600)//60):02}:{start%60:05.2f}"
+                    t_e = f"{int(end//3600)}:{int((end%3600)//60):02}:{end%60:05.2f}"
+                    lines.append(f"Dialogue: 0,{t_s},{t_e},{style},,0,0,0,,{anim}{clean_w}")
 
-                    # --- THE VISUAL MAGIC ---
-                    # 1. Random Anywhere: x from 100 to 540, y from 50 to 300 (Keeps it on screen)
-                    x = random.randint(100, 540)
-                    y = random.randint(50, 300)
-                    
-                    # 2. Pop & Hover: 
-                    # \move(x,y, x,y-20) makes it float up slowly.
-                    # \t(...) makes it pop big then shrink.
-                    animation = f"{{\\move({x},{y},{x},{y-25})\\t(0,80,\\fscx160\\fscy160)\\t(80,200,\\fscx100\\fscy100)}}"
-                    
-                    ass_lines.append(f"Dialogue: 0,{t_s},{t_e},{current_style},,0,0,0,,{animation}{clean_w}")
-
-            # Export Mixed Audio and ASS
-            main_audio.export("mixed_audio.wav", format="wav")
-            with open("viral.ass", "w", encoding="utf-8") as f:
-                f.write(ass_header + events_header + "\n".join(ass_lines))
-
-        with st.spinner("Burning Chaos Effects into Video..."):
-            output_name = "output_chaos.mp4"
-            # FFmpeg merges the NEW mixed audio + video + ASS subtitles
-            subprocess.run([
-                "ffmpeg", "-y", "-i", "temp_video.mp4", "-i", "mixed_audio.wav",
-                "-vf", "ass=viral.ass", "-c:v", "libx264", "-c:a", "aac", 
-                "-map", "0:v:0", "-map", "1:a:0", output_name
-            ])
+            # 4. Final Export
+            main_audio.export("final_audio.wav", format="wav")
+            with open("sub.ass", "w") as f: f.write(ass_header + "\n".join(lines))
             
-            st.success("✅ Random Hover, Pops, and Sound Effects Synced!")
-            st.video(output_name)
-            with open(output_name, "rb") as f:
-                st.download_button("📥 Download Chaos Edit", f, "chaos_edit.mp4")
+            subprocess.run(["ffmpeg", "-y", "-i", "input.mp4", "-i", "final_audio.wav", "-vf", "ass=sub.ass", "-map", "0:v", "-map", "1:a", "-shortest", "out.mp4"])
+            
+            st.video("out.mp4")
