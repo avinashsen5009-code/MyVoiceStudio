@@ -1,6 +1,2 @@
 streamlit
-edge-tts
 openai-whisper
-soundfile
-numpy
-openai
