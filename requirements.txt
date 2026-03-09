@@ -1,6 +1,7 @@
 streamlit
+openai-whisper
 kokoro
 soundfile
 numpy
 pydub
-torch
+torchs
