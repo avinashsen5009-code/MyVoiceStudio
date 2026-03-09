@@ -1,5 +1,9 @@
 streamlit
-kokoro-onnx
+openai-whisper
+moviepy
+ffmpeg-python
 soundfile
+kokoro-onnx
+huggingface_hub
 numpy
-onnxruntime
+torch
