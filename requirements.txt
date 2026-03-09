@@ -3,3 +3,4 @@ kokoro
 soundfile
 numpy
 pydub
+torch
