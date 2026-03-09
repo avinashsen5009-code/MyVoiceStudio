@@ -1,8 +1,5 @@
 streamlit
-openai-whisper
-pydub
-setuptools
-torch
 kokoro
 soundfile
 numpy
+pydub
