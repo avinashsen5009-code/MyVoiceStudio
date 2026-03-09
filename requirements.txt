@@ -1,6 +1,8 @@
 streamlit
 openai-whisper
-gTTS
 pydub
 setuptools
 torch
+kokoro
+soundfile
+numpy
