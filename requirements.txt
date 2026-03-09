@@ -1,7 +1,5 @@
 streamlit
-openai-whisper
-kokoro
+kokoro-onnx
 soundfile
 numpy
-pydub
-torchs
+onnxruntime
