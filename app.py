@@ -118,10 +118,9 @@ with tab_creator:
                 samples, sr = kokoro.create(txt, voice=unique_voice, speed=speed_jitter)
 
                 sf.write("unique_audio.wav", samples, sr)
+    with st.spinner("Creating Word-Level Animation..."):
 
-           with st.spinner("Creating Word-Level Animation..."):
-
-    result = whisper_engine.transcribe("unique_audio.wav", word_timestamps=True)
+          result = whisper_engine.transcribe("unique_audio.wav", word_timestamps=True)
 
     colors = [t_color1, t_color2, t_color3]
 
