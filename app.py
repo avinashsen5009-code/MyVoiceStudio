@@ -19,6 +19,19 @@ def hex_to_ass(hex_color):
     hex_color = hex_color.lstrip('#')
     return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
 
+emoji_map = {
+    "money":"💰",
+    "success":"🚀",
+    "power":"⚡",
+    "brain":"🧠",
+    "focus":"🎯",
+    "win":"🏆",
+    "fail":"💀",
+    "life":"🌍",
+    "time":"⏳",
+    "danger":"⚠️"
+}
+
 # --- 2. LOAD AI ENGINES ---
 @st.cache_resource
 def init_tools():
@@ -40,8 +53,16 @@ speed_jitter = st.sidebar.slider("Speed Variation", 0.8, 1.5, 1.1)
 st.sidebar.subheader("Caption Visuals")
 
 anim_style = st.sidebar.selectbox(
-    "Animation Style",
-    ["Random Jump", "Center Shake", "Zoom In", "Static Bottom", "Story Blocks"]
+    "Caption Preset",
+    [
+        "Dynamic Word",
+        "Story Blocks",
+        "Bottom Clean",
+        "Emoji Pop",
+        "Hormozi",
+        "MrBeast Pop",
+        "Iman Clean"
+    ]
 )
 
 t_color1 = st.sidebar.color_picker("Caption Color 1", "#D4AF37")
@@ -98,124 +119,113 @@ with tab_creator:
 
                 sf.write("unique_audio.wav", samples, sr)
 
-            with st.spinner("Creating Word-Level Animation..."):
+           with st.spinner("Creating Word-Level Animation..."):
 
-                result = whisper_engine.transcribe(
-                    "unique_audio.wav",
-                    word_timestamps=True
-                )
+    result = whisper_engine.transcribe("unique_audio.wav", word_timestamps=True)
 
-                colors = [t_color1, t_color2, t_color3]
+    colors = [t_color1, t_color2, t_color3]
 
-                ass_header = f"""
+    ass_header = f"""
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
-ScaledBorderAndShadow: yes
 
 [V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginL, MarginR, MarginV
-Style: Default,Arial,{t_size},{hex_to_ass(t_color1)},&H00000000,1,3,2,20,20,40
+Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV
+Style: Default,Arial,{t_size},&H00FFFFFF,&H00000000,1,3,2,40
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-                ass_lines = []
+    ass_lines = []
+    word_counter = 0
 
-                for seg in result['segments']:
+    for seg in result['segments']:
 
-                    words = seg['words']
+        for word in seg['words']:
 
-                    i = 0
+            s = word['start']
+            e = word['end']
 
-                    while i < len(words):
+            t_in = f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
+            t_out = f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
 
-                        word = words[i]
+            clean_word = word['word'].strip().upper()
 
-                        s, e = word['start'], word['end']
+            color = hex_to_ass(colors[word_counter % 3])
 
-                        t_in = f"{int(s//3600):01}:{int((s%3600)//60):02}:{s%60:05.2f}"
-                        t_out = f"{int(e//3600):01}:{int((e%3600)//60):02}:{e%60:05.2f}"
+            emoji = ""
+            if clean_word.lower() in emoji_map:
+                emoji = " " + emoji_map[clean_word.lower()]
 
-                        clean_word = word['word'].strip().upper()
+            # Dynamic Word (Left / Right)
+            if anim_style == "Dynamic Word":
 
-                        rand_color = hex_to_ass(random.choice(colors))
+                pos = "\\pos(250,950)" if word_counter % 2 == 0 else "\\pos(830,950)"
 
-                        if anim_style == "Random Jump":
+                text = f"{{\\c{color}}}{clean_word}{emoji}"
 
-                            pos = f"\\pos({random.randint(200,880)},{random.randint(300,1500)})"
+            # Story Blocks (same but slightly higher)
+            elif anim_style == "Story Blocks":
 
-                        elif anim_style == "Center Shake":
+                pos = "\\pos(250,850)" if word_counter % 2 == 0 else "\\pos(830,850)"
 
-                            pos = f"\\pos({540+random.randint(-20,20)},{960+random.randint(-20,20)})"
+                text = f"{{\\c{color}}}{clean_word}{emoji}"
 
-                        elif anim_style == "Zoom In":
+            # Bottom Clean
+            elif anim_style == "Bottom Clean":
 
-                            pos = "\\pos(540,960)\\fscx150\\fscy150\\t(0,120,\\fscx100,\\fscy100)"
+                pos = "\\pos(540,1700)"
+                text = f"{clean_word}"
 
-                        elif anim_style == "Static Bottom":
+            # Emoji Pop
+            elif anim_style == "Emoji Pop":
 
-                            pos = "\\pos(540,1700)"
+                pos = "\\pos(540,960)"
+                text = f"{{\\fscx130\\fscy130}}{clean_word}{emoji}"
 
-                        elif anim_style == "Story Blocks":
+            # Hormozi Style
+            elif anim_style == "Hormozi":
 
-                            block_size = random.randint(4,6)
+                pos = "\\pos(540,960)"
 
-                            block_words = []
+                if len(clean_word) > 5:
+                    text = f"{{\\c&H0000FF00\\b1}}{clean_word}"
+                else:
+                    text = clean_word
 
-                            start = words[i]['start']
-                            end = words[min(i+block_size-1, len(words)-1)]['end']
+            # MrBeast Pop
+            elif anim_style == "MrBeast Pop":
 
-                            for w in words[i:i+block_size]:
+                pos = "\\pos(540,960)"
+                text = f"{{\\fscx160\\fscy160\\t(0,120,\\fscx100,\\fscy100)}}{clean_word}"
 
-                                block_words.append(w['word'].strip().upper())
+            # Iman Clean
+            elif anim_style == "Iman Clean":
 
-                            lines = []
-                            j = 0
+                pos = "\\pos(540,1650)"
+                text = clean_word
 
-                            while j < len(block_words):
+            ass_lines.append(
+                f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text}"
+            )
 
-                                line_len = random.randint(2,3)
+            word_counter += 1
 
-                                lines.append(" ".join(block_words[j:j+line_len]))
+    # save ASS subtitle file
+with open("typo.ass", "w", encoding="utf-8") as f:
+    f.write(ass_header + "\n".join(ass_lines))
 
-                                j += line_len
+# update Streamlit UI after file is written
+st.session_state.history.append(f"Voice: {v1}+{v2} | Text: {txt[:40]}...")
 
-                            text_block = "\\N".join(lines[:3])
+st.audio("unique_audio.wav")
 
-                            if random.random() > 0.5:
-                                pos = "\\pos(250,900)"
-                            else:
-                                pos = "\\pos(830,900)"
+st.success("DNA Generated. Ready to Render.")
 
-                            t_in = f"{int(start//3600):01}:{int((start%3600)//60):02}:{start%60:05.2f}"
-                            t_out = f"{int(end//3600):01}:{int((end%3600)//60):02}:{end%60:05.2f}"
-
-                            ass_lines.append(
-                                f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text_block}"
-                            )
-
-                            i += block_size
-                            continue
-
-                        ass_lines.append(
-                            f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{{pos}\\c{rand_color}}}{clean_word}"
-                        )
-
-                        i += 1
-
-                with open("typo.ass", "w", encoding="utf-8") as f:
-                    f.write(ass_header + "\n".join(ass_lines))
-
-                st.session_state.history.append(f"Voice: {v1}+{v2} | Text: {txt[:40]}...")
-
-                st.audio("unique_audio.wav")
-
-                st.success("DNA Generated. Ready to Render.")
-
-    with col2:
+with col2:
 
         st.subheader("2. Final Rendering")
 
