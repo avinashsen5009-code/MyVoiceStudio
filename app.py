@@ -6,26 +6,55 @@ import numpy as np
 import soundfile as sf
 from huggingface_hub import hf_hub_download
 from kokoro_onnx import Kokoro
+import re
 
-st.set_page_config(page_title="Avinash Sen: Ultra Studio", layout="wide")
+st.set_page_config(page_title="Avinash Sen Ultra Studio", layout="wide")
 
 if 'history' not in st.session_state:
     st.session_state.history = []
+
+# ---------------------------
+# HELPERS
+# ---------------------------
 
 def hex_to_ass(hex_color):
     hex_color = hex_color.lstrip('#')
     return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
 
+def clean_word(word):
+    word = re.sub(r'[^\w\s]', '', word)
+    return word.upper()
+
+def normalize_audio(samples):
+    samples = np.array(samples)
+
+    if samples.ndim > 1:
+        samples = samples.mean(axis=1)
+
+    samples = samples / np.max(np.abs(samples))
+
+    return samples
+
+
 emoji_map = {
-    "money":"💰","success":"🚀","power":"⚡","brain":"🧠",
-    "focus":"🎯","win":"🏆","fail":"💀","life":"🌍",
-    "time":"⏳","danger":"⚠️"
+    "MONEY":"💰",
+    "SUCCESS":"🚀",
+    "POWER":"⚡",
+    "BRAIN":"🧠",
+    "FOCUS":"🎯",
+    "WIN":"🏆",
+    "FAIL":"💀",
+    "LIFE":"🌍",
+    "TIME":"⏳"
 }
 
 highlight_words = [
-    "MONEY","SUCCESS","POWER","FOCUS","WIN",
-    "FAIL","LIFE","TIME","BRAIN"
+    "MONEY","SUCCESS","POWER","FOCUS","WIN","FAIL","BRAIN"
 ]
+
+# ---------------------------
+# LOAD MODELS
+# ---------------------------
 
 @st.cache_resource
 def init_tools():
@@ -49,10 +78,16 @@ def init_tools():
 
 kokoro, whisper_engine = init_tools()
 
-st.sidebar.title("🧬 Voice DNA & Style")
+# ---------------------------
+# SIDEBAR
+# ---------------------------
+
+st.sidebar.title("🧬 Voice DNA")
 
 dna_jitter = st.sidebar.slider("DNA Randomization",0.0,0.1,0.02)
 speed_jitter = st.sidebar.slider("Speed Variation",0.8,1.5,1.1)
+
+st.sidebar.title("Caption Style")
 
 anim_style = st.sidebar.selectbox(
     "Caption Preset",
@@ -63,7 +98,8 @@ anim_style = st.sidebar.selectbox(
         "Emoji Pop",
         "Hormozi",
         "MrBeast Pop",
-        "Iman Clean"
+        "Iman Clean",
+        "Cinematic Blocks"
     ]
 )
 
@@ -72,6 +108,10 @@ t_color2 = st.sidebar.color_picker("Caption Color 2","#FF4C4C")
 t_color3 = st.sidebar.color_picker("Caption Color 3","#4CFFB5")
 
 t_size = st.sidebar.slider("Font Size",20,100,55)
+
+# ---------------------------
+# UI
+# ---------------------------
 
 st.title("🎬 Avinash Sen Ultra Studio")
 
@@ -104,18 +144,18 @@ with tab_creator:
 
         if st.button("🔥 Generate Unique Audio"):
 
-            with st.spinner("Blending Neural DNA..."):
+            with st.spinner("Generating voice..."):
 
                 s1 = kokoro.get_voice_style(v1)
                 s2 = kokoro.get_voice_style(v2)
 
-                blended = (s1*(1-mix))+(s2*mix)
+                blended = (s1*(1-mix)) + (s2*mix)
 
                 noise = np.random.uniform(
                     -dna_jitter,dna_jitter,blended.shape
                 ).astype(np.float32)
 
-                unique_voice = blended+noise
+                unique_voice = blended + noise
 
                 samples,sr = kokoro.create(
                     txt,
@@ -123,164 +163,175 @@ with tab_creator:
                     speed=speed_jitter
                 )
 
+                samples = normalize_audio(samples)
+
                 audio_path="unique_audio.wav"
 
-                sf.write(audio_path,samples,sr,subtype="PCM_16")
+                sf.write(audio_path,samples,sr,format="WAV",subtype="PCM_16")
 
-                if not os.path.exists(audio_path):
-                    st.error("Audio generation failed")
+                if not os.path.exists(audio_path) or os.path.getsize(audio_path)<1000:
+                    st.error("Audio generation failed.")
                     st.stop()
 
-            with st.spinner("Creating Word-Level Animation..."):
+            with st.spinner("Generating captions..."):
 
                 result = whisper_engine.transcribe(
                     audio_path,
-                    word_timestamps=True
+                    word_timestamps=True,
+                    fp16=False
                 )
 
-                colors=[t_color1,t_color2,t_color3]
+                words=[]
+
+                for seg in result["segments"]:
+                    for w in seg["words"]:
+                        words.append(w)
 
                 ass_header=f"""
 [Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX:1080
+PlayResY:1920
 
 [V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV
+Format: Name,Fontname,Fontsize,PrimaryColour,OutlineColour,BorderStyle,Outline,Alignment,MarginV
 Style: Default,Arial,{t_size},&H00FFFFFF,&H00000000,1,4,2,40
 
 [Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
                 ass_lines=[]
-                word_counter=0
 
-                for seg in result['segments']:
+                colors=[t_color1,t_color2,t_color3]
 
-                    for word in seg['words']:
+                i=0
 
-                        s=word['start']
-                        e=word['end']+0.15
+                while i < len(words):
 
-                        t_in=f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
-                        t_out=f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
+                    if anim_style=="Cinematic Blocks":
 
-                        clean_word = word['word']
-                        clean_word = clean_word.replace(",","").replace(".","")
-                        clean_word = clean_word.strip().upper()
+                        chunk=words[i:i+3]
 
-                        color = hex_to_ass(colors[word_counter%3])
+                        start=chunk[0]["start"]
+                        end=chunk[-1]["end"]+0.2
 
-                        if clean_word in highlight_words:
-                            color="&H0000FFFF"
+                        t_in=f"{int(start//3600)}:{int((start%3600)//60):02}:{start%60:05.2f}"
+                        t_out=f"{int(end//3600)}:{int((end%3600)//60):02}:{end%60:05.2f}"
 
-                        emoji=""
-                        if clean_word.lower() in emoji_map:
-                            emoji=" "+emoji_map[clean_word.lower()]
+                        text_words=[]
 
-                        if anim_style=="Dynamic Word":
+                        for w in chunk:
 
-                            pos="\\pos(250,950)" if word_counter%2==0 else "\\pos(830,950)"
-                            text=f"{{\\c{color}}}{clean_word}{emoji}"
+                            cw=clean_word(w["word"])
 
-                        elif anim_style=="Story Blocks":
+                            if cw in highlight_words:
+                                cw=f"{{\\c&H0000FFFF}}{cw}"
 
-                            pos="\\pos(250,850)" if word_counter%2==0 else "\\pos(830,850)"
-                            text=f"{{\\c{color}}}{clean_word}{emoji}"
+                            text_words.append(cw)
 
-                        elif anim_style=="Bottom Clean":
+                        text=" ".join(text_words)
 
-                            pos="\\pos(540,1700)"
-                            text=clean_word
-
-                        elif anim_style=="Emoji Pop":
-
-                            pos="\\pos(540,960)"
-                            text=f"{{\\fscx130\\fscy130}}{clean_word}{emoji}"
-
-                        elif anim_style=="Hormozi":
-
-                            pos="\\pos(540,960)"
-
-                            if len(clean_word)>5:
-                                text=f"{{\\c&H0000FF00\\b1}}{clean_word}"
-                            else:
-                                text=clean_word
-
-                        elif anim_style=="MrBeast Pop":
-
-                            pos="\\pos(540,960)"
-                            text=f"{{\\fscx160\\fscy160\\t(0,120,\\fscx100,\\fscy100)}}{clean_word}"
-
-                        elif anim_style=="Iman Clean":
-
-                            pos="\\pos(540,1650)"
-                            text=clean_word
+                        pos="\\pos(540,960)"
 
                         ass_lines.append(
-                            f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text}"
+                            f"Dialogue:0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text}"
                         )
 
-                        word_counter+=1
+                        i+=3
+                        continue
+
+                    word=words[i]
+
+                    s=word["start"]
+                    e=word["end"]+0.15
+
+                    t_in=f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
+                    t_out=f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
+
+                    clean=clean_word(word["word"])
+
+                    color=hex_to_ass(colors[i%3])
+
+                    emoji=""
+                    if clean in emoji_map:
+                        emoji=" "+emoji_map[clean]
+
+                    if anim_style=="Dynamic Word":
+                        pos="\\pos(250,950)" if i%2==0 else "\\pos(830,950)"
+                        text=f"{{\\c{color}}}{clean}{emoji}"
+
+                    elif anim_style=="Story Blocks":
+                        pos="\\pos(250,850)" if i%2==0 else "\\pos(830,850)"
+                        text=f"{{\\c{color}}}{clean}{emoji}"
+
+                    elif anim_style=="Bottom Clean":
+                        pos="\\pos(540,1700)"
+                        text=clean
+
+                    elif anim_style=="Emoji Pop":
+                        pos="\\pos(540,960)"
+                        text=f"{{\\fscx130\\fscy130}}{clean}{emoji}"
+
+                    elif anim_style=="Hormozi":
+                        pos="\\pos(540,960)"
+                        text=f"{{\\b1}}{clean}"
+
+                    elif anim_style=="MrBeast Pop":
+                        pos="\\pos(540,960)"
+                        text=f"{{\\fscx160\\fscy160\\t(0,120,\\fscx100,\\fscy100)}}{clean}"
+
+                    elif anim_style=="Iman Clean":
+                        pos="\\pos(540,1650)"
+                        text=clean
+
+                    ass_lines.append(
+                        f"Dialogue:0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text}"
+                    )
+
+                    i+=1
 
                 with open("typo.ass","w",encoding="utf-8") as f:
                     f.write(ass_header+"\n".join(ass_lines))
 
-            st.session_state.history.append(
-                f"Voice: {v1}+{v2} | Text: {txt[:40]}..."
-            )
-
             st.audio(audio_path)
 
-            st.success("DNA Generated. Ready to Render.")
+            st.session_state.history.append(txt[:50])
+
+            st.success("Audio + captions generated.")
 
     with col2:
 
-        video_file=st.file_uploader("Upload Video Background",type=["mp4"])
+        video_file=st.file_uploader("Upload background video",type=["mp4"])
 
-        if video_file and st.button("🎥 Render for YouTube/Reels"):
+        if video_file and st.button("🎥 Render Video"):
 
-            with st.spinner("Rendering Video..."):
+            with open("bg.mp4","wb") as f:
+                f.write(video_file.getbuffer())
 
-                with open("bg.mp4","wb") as f:
-                    f.write(video_file.getbuffer())
+            cmd=[
+                "ffmpeg",
+                "-y",
+                "-i","bg.mp4",
+                "-i","unique_audio.wav",
+                "-vf","ass=typo.ass",
+                "-c:v","libx264",
+                "-c:a","aac",
+                "-shortest",
+                "viral.mp4"
+            ]
 
-                cmd=[
-                    "ffmpeg",
-                    "-y",
-                    "-i","bg.mp4",
-                    "-i","unique_audio.wav",
-                    "-vf","ass=typo.ass",
-                    "-c:v","libx264",
-                    "-c:a","aac",
-                    "-map","0:v:0",
-                    "-map","1:a:0",
-                    "-shortest",
-                    "viral.mp4"
-                ]
+            subprocess.run(cmd)
 
-                subprocess.run(cmd)
+            st.video("viral.mp4")
 
-                st.video("viral.mp4")
-
-                with open("viral.mp4","rb") as f:
-
-                    st.download_button(
-                        "📥 Download Viral Video",
-                        f,
-                        "viral_video.mp4"
-                    )
+            with open("viral.mp4","rb") as f:
+                st.download_button("Download Video",f,"viral_video.mp4")
 
 with tab_history:
 
     full_log="\n".join(st.session_state.history)
 
-    st.text_area("History Summary",full_log,height=200)
+    st.text_area("History",full_log,height=200)
 
-    st.download_button(
-        "💾 Download History .txt",
-        full_log,
-        "studio_history.txt"
-    )
+    st.download_button("Download Log",full_log,"studio_history.txt")
