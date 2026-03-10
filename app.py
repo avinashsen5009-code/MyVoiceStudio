@@ -2,78 +2,57 @@ import streamlit as st
 import subprocess
 import whisper
 import os
-import random
 import numpy as np
 import soundfile as sf
 from huggingface_hub import hf_hub_download
 from kokoro_onnx import Kokoro
 
-# --- 1. SETTINGS & HELPERS ---
 st.set_page_config(page_title="Avinash Sen: Ultra Studio", layout="wide")
 
 if 'history' not in st.session_state:
     st.session_state.history = []
 
 def hex_to_ass(hex_color):
-    """Convert #RRGGBB to ASS format"""
     hex_color = hex_color.lstrip('#')
     return f"&H00{hex_color[4:6]}{hex_color[2:4]}{hex_color[0:2]}"
 
 emoji_map = {
-    "money":"💰",
-    "success":"🚀",
-    "power":"⚡",
-    "brain":"🧠",
-    "focus":"🎯",
-    "win":"🏆",
-    "fail":"💀",
-    "life":"🌍",
-    "time":"⏳",
-    "danger":"⚠️"
+    "money":"💰","success":"🚀","power":"⚡","brain":"🧠",
+    "focus":"🎯","win":"🏆","fail":"💀","life":"🌍",
+    "time":"⏳","danger":"⚠️"
 }
 
-# --- 2. LOAD AI ENGINES ---
+highlight_words = [
+    "MONEY","SUCCESS","POWER","FOCUS","WIN",
+    "FAIL","LIFE","TIME","BRAIN"
+]
+
 @st.cache_resource
 def init_tools():
+
     model_path = hf_hub_download(
         repo_id="leonelhs/kokoro-thewh1teagle",
         filename="kokoro-v1.0.onnx"
     )
 
-    voices_path = hf_hub_download(
+    voice_path = hf_hub_download(
         repo_id="leonelhs/kokoro-thewh1teagle",
         filename="voices-v1.0.bin"
     )
 
-    kokoro = Kokoro(model_path, voices_path)
+    kokoro = Kokoro(model_path, voice_path)
 
-    whisper_model = whisper.load_model("tiny")
+    whisper_model = whisper.load_model("small")
 
     return kokoro, whisper_model
 
 
 kokoro, whisper_engine = init_tools()
 
-# --- 3. SIDEBAR ---
 st.sidebar.title("🧬 Voice DNA & Style")
 
-st.sidebar.subheader("Algorithm Protection")
-
-dna_jitter = st.sidebar.slider(
-    "DNA Randomization",
-    0.0,
-    0.1,
-    0.02
-)
-
-speed_jitter = st.sidebar.slider(
-    "Speed Variation",
-    0.8,
-    1.5,
-    1.1
-)
-
-st.sidebar.subheader("Caption Visuals")
+dna_jitter = st.sidebar.slider("DNA Randomization",0.0,0.1,0.02)
+speed_jitter = st.sidebar.slider("Speed Variation",0.8,1.5,1.1)
 
 anim_style = st.sidebar.selectbox(
     "Caption Preset",
@@ -88,26 +67,21 @@ anim_style = st.sidebar.selectbox(
     ]
 )
 
-t_color1 = st.sidebar.color_picker("Caption Color 1", "#D4AF37")
-t_color2 = st.sidebar.color_picker("Caption Color 2", "#FF4C4C")
-t_color3 = st.sidebar.color_picker("Caption Color 3", "#4CFFB5")
+t_color1 = st.sidebar.color_picker("Caption Color 1","#D4AF37")
+t_color2 = st.sidebar.color_picker("Caption Color 2","#FF4C4C")
+t_color3 = st.sidebar.color_picker("Caption Color 3","#4CFFB5")
 
-t_size = st.sidebar.slider("Font Size", 20, 100, 55)
+t_size = st.sidebar.slider("Font Size",20,100,55)
 
-# --- MAIN INTERFACE ---
 st.title("🎬 Avinash Sen Ultra Studio")
 
-tab_creator, tab_history = st.tabs(
-    ["🚀 Viral Engine", "📜 Work Log"]
-)
+tab_creator, tab_history = st.tabs(["🚀 Viral Engine","📜 Work Log"])
 
 with tab_creator:
 
-    col1, col2 = st.columns([1,1])
+    col1,col2 = st.columns([1,1])
 
     with col1:
-
-        st.subheader("1. Script & Fusion")
 
         txt = st.text_area(
             "What's the story?",
@@ -120,16 +94,13 @@ with tab_creator:
             "bf_emma","bm_george","bm_lewis"
         ]
 
-        v1 = st.selectbox("Primary Voice", voices)
+        v1 = st.selectbox("Primary Voice",voices)
 
-        use_fusion = st.checkbox("Enable Fusion (Unique Blend)")
+        use_fusion = st.checkbox("Enable Fusion")
 
-        if use_fusion:
-            v2 = st.selectbox("Partner Voice", voices, index=1)
-        else:
-            v2 = v1
+        v2 = st.selectbox("Partner Voice",voices,index=1) if use_fusion else v1
 
-        mix = st.sidebar.slider("Fusion Mix %",0,100,50) / 100
+        mix = st.sidebar.slider("Fusion Mix %",0,100,50)/100
 
         if st.button("🔥 Generate Unique Audio"):
 
@@ -138,30 +109,23 @@ with tab_creator:
                 s1 = kokoro.get_voice_style(v1)
                 s2 = kokoro.get_voice_style(v2)
 
-                blended = (s1*(1-mix)) + (s2*mix)
+                blended = (s1*(1-mix))+(s2*mix)
 
                 noise = np.random.uniform(
-                    -dna_jitter,
-                    dna_jitter,
-                    blended.shape
+                    -dna_jitter,dna_jitter,blended.shape
                 ).astype(np.float32)
 
-                unique_voice = blended + noise
+                unique_voice = blended+noise
 
-                samples, sr = kokoro.create(
+                samples,sr = kokoro.create(
                     txt,
                     voice=unique_voice,
                     speed=speed_jitter
                 )
 
-                audio_path = "unique_audio.wav"
+                audio_path="unique_audio.wav"
 
-                sf.write(
-                    audio_path,
-                    samples,
-                    sr,
-                    subtype="PCM_16"
-                )
+                sf.write(audio_path,samples,sr,subtype="PCM_16")
 
                 if not os.path.exists(audio_path):
                     st.error("Audio generation failed")
@@ -174,9 +138,9 @@ with tab_creator:
                     word_timestamps=True
                 )
 
-                colors = [t_color1,t_color2,t_color3]
+                colors=[t_color1,t_color2,t_color3]
 
-                ass_header = f"""
+                ass_header=f"""
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -184,54 +148,54 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BorderStyle, Outline, Alignment, MarginV
-Style: Default,Arial,{t_size},&H00FFFFFF,&H00000000,1,3,2,40
+Style: Default,Arial,{t_size},&H00FFFFFF,&H00000000,1,4,2,40
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-                ass_lines = []
-                word_counter = 0
+                ass_lines=[]
+                word_counter=0
 
                 for seg in result['segments']:
 
                     for word in seg['words']:
 
-                        s = word['start']
-                        e = word['end']
+                        s=word['start']
+                        e=word['end']+0.15
 
-                        t_in = f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
-                        t_out = f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
+                        t_in=f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
+                        t_out=f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
 
-                        clean_word = word['word'].strip().upper()
+                        clean_word = word['word']
+                        clean_word = clean_word.replace(",","").replace(".","")
+                        clean_word = clean_word.strip().upper()
 
-                        color = hex_to_ass(
-                            colors[word_counter % 3]
-                        )
+                        color = hex_to_ass(colors[word_counter%3])
 
-                        emoji = ""
+                        if clean_word in highlight_words:
+                            color="&H0000FFFF"
 
+                        emoji=""
                         if clean_word.lower() in emoji_map:
-                            emoji = " " + emoji_map[clean_word.lower()]
+                            emoji=" "+emoji_map[clean_word.lower()]
 
-                        if anim_style == "Dynamic Word":
+                        if anim_style=="Dynamic Word":
 
-                            pos = "\\pos(250,950)" if word_counter % 2 == 0 else "\\pos(830,950)"
+                            pos="\\pos(250,950)" if word_counter%2==0 else "\\pos(830,950)"
+                            text=f"{{\\c{color}}}{clean_word}{emoji}"
 
-                            text = f"{{\\c{color}}}{clean_word}{emoji}"
+                        elif anim_style=="Story Blocks":
 
-                        elif anim_style == "Story Blocks":
+                            pos="\\pos(250,850)" if word_counter%2==0 else "\\pos(830,850)"
+                            text=f"{{\\c{color}}}{clean_word}{emoji}"
 
-                            pos = "\\pos(250,850)" if word_counter % 2 == 0 else "\\pos(830,850)"
-
-                            text = f"{{\\c{color}}}{clean_word}{emoji}"
-
-                        elif anim_style == "Bottom Clean":
+                        elif anim_style=="Bottom Clean":
 
                             pos="\\pos(540,1700)"
-                            text = clean_word
+                            text=clean_word
 
-                        elif anim_style == "Emoji Pop":
+                        elif anim_style=="Emoji Pop":
 
                             pos="\\pos(540,960)"
                             text=f"{{\\fscx130\\fscy130}}{clean_word}{emoji}"
@@ -248,7 +212,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         elif anim_style=="MrBeast Pop":
 
                             pos="\\pos(540,960)"
-
                             text=f"{{\\fscx160\\fscy160\\t(0,120,\\fscx100,\\fscy100)}}{clean_word}"
 
                         elif anim_style=="Iman Clean":
@@ -260,11 +223,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             f"Dialogue: 0,{t_in},{t_out},Default,,0,0,0,,{{{pos}}}{text}"
                         )
 
-                        word_counter += 1
+                        word_counter+=1
 
                 with open("typo.ass","w",encoding="utf-8") as f:
-
-                    f.write(ass_header + "\n".join(ass_lines))
+                    f.write(ass_header+"\n".join(ass_lines))
 
             st.session_state.history.append(
                 f"Voice: {v1}+{v2} | Text: {txt[:40]}..."
@@ -276,16 +238,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     with col2:
 
-        st.subheader("2. Final Rendering")
-
-        video_file = st.file_uploader(
-            "Upload Video Background",
-            type=["mp4"]
-        )
+        video_file=st.file_uploader("Upload Video Background",type=["mp4"])
 
         if video_file and st.button("🎥 Render for YouTube/Reels"):
 
-            with st.spinner("Hardcoding DNA & Animations..."):
+            with st.spinner("Rendering Video..."):
 
                 with open("bg.mp4","wb") as f:
                     f.write(video_file.getbuffer())
@@ -318,15 +275,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 with tab_history:
 
-    st.subheader("Session Downloads")
+    full_log="\n".join(st.session_state.history)
 
-    full_log = "\n".join(st.session_state.history)
-
-    st.text_area(
-        "History Summary",
-        full_log,
-        height=200
-    )
+    st.text_area("History Summary",full_log,height=200)
 
     st.download_button(
         "💾 Download History .txt",
