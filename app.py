@@ -214,7 +214,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                         chunk=words[i:i+3]
 
                         start=chunk[0]["start"]
-                        end=chunk[-1]["end"]+0.2
+                        end=chunk[-1]["end"]
 
                         t_in=f"{int(start//3600)}:{int((start%3600)//60):02}:{start%60:05.2f}"
                         t_out=f"{int(end//3600)}:{int((end%3600)//60):02}:{end%60:05.2f}"
@@ -244,7 +244,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                     word=words[i]
 
                     s=word["start"]
-                    e=word["end"]+0.15
+                    e=word["end"]
 
                     t_in=f"{int(s//3600)}:{int((s%3600)//60):02}:{s%60:05.2f}"
                     t_out=f"{int(e//3600)}:{int((e%3600)//60):02}:{e%60:05.2f}"
